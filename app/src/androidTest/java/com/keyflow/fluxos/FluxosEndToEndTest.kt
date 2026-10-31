@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
@@ -111,9 +112,12 @@ class FluxosEndToEndTest {
         OverlayService.avisoDeFluxoForTest = { mensagem, _ -> avisos += mensagem }
         OverlayService.errorBannerDurationMsForTest = 30_000
         instrumentation.runOnMainSync { KeyFlowController.updateFluxo(EstadoExecucao.Ocioso) }
+        finais.clear()
+        observador.launch { KeyFlowController.fluxo.collect { if (it.fluxoIdOuNulo() != null) finais += it } }
     }
 
     @After fun limpar() = runBlocking {
+        observador.coroutineContext[kotlinx.coroutines.Job]?.cancel()
         try {
             if (KeyFlowController.buttonState.value in listOf(ButtonState.RECORDING, ButtonState.PAUSED)) {
                 context.startService(OverlayService.actionIntent(context, com.keyflow.overlay.RecordingNotification.ACTION_CANCEL))
@@ -143,12 +147,20 @@ class FluxosEndToEndTest {
     private fun rodarAgora(id: String) = OverlayService.start(context,
         OverlayService.actionIntent(context, "com.keyflow.overlay.RUN_FLOW").putExtra("fluxo_id", id))
 
+    /** Os estados finais publicados (o controlador volta a Ocioso depois, então só observar o valor atual perderia o fim). */
+    private val finais = CopyOnWriteArrayList<EstadoExecucao>()
+    private val observador = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+
     private suspend fun terminou(id: String): EstadoExecucao {
-        aguardar("o fluxo $id não terminou") {
-            val e = KeyFlowController.fluxo.value
-            e is EstadoExecucao.Concluido || e is EstadoExecucao.Falhou || e is EstadoExecucao.Cancelado
-        }
-        return KeyFlowController.fluxo.value
+        aguardar("o fluxo $id não terminou") { finais.any { it.fluxoIdOuNulo() == id } }
+        return finais.last { it.fluxoIdOuNulo() == id }
+    }
+
+    private fun EstadoExecucao.fluxoIdOuNulo(): String? = when (this) {
+        is EstadoExecucao.Concluido -> fluxoId
+        is EstadoExecucao.Falhou -> fluxoId
+        is EstadoExecucao.Cancelado -> fluxoId
+        else -> null
     }
 
     private fun tipos() = chamadas.map { it.first }
@@ -219,15 +231,15 @@ class FluxosEndToEndTest {
     @Test fun cancelarEmCadaEtapaPara() = runBlocking {
         val todas = Fluxo("todas", "Todas", etapas = listOf(Etapa.Ditar(), Etapa.Perguntar(), Etapa.Falar(), Etapa.Inserir))
         listOf(TipoEtapa.PERGUNTAR, TipoEtapa.FALAR).forEach { alvo ->
-            chamadas.clear(); avisos.clear()
-            instrumentation.runOnMainSync { KeyFlowController.updateFluxo(EstadoExecucao.Ocioso) }
+            chamadas.clear(); finais.clear(); avisos.clear()
+            instrumentation.runOnMainSync { KeyFlowController.updateFluxo(EstadoExecucao.Ocioso) }; finais.clear()
             cancelarNaEtapa(todas, alvo)
             aguardar("o serviço não ficou livre") { OverlayService.instanceForVisionTest?.fluxoAtivoForTest != true }
         }
-        chamadas.clear(); avisos.clear()
+        chamadas.clear(); finais.clear(); avisos.clear()
         instrumentation.runOnMainSync { KeyFlowController.updateFluxo(EstadoExecucao.Ocioso) }
         cancelarNaEtapa(agente, TipoEtapa.AGENTE)
-        chamadas.clear(); avisos.clear(); liberadas.set(0)
+        chamadas.clear(); finais.clear(); avisos.clear(); liberadas.set(0)
         instrumentation.runOnMainSync { KeyFlowController.updateFluxo(EstadoExecucao.Ocioso) }
         cancelarNaEtapa(lerTela, TipoEtapa.VISAO)
         assertEquals("cancelar na Visão também libera a imagem", 1, liberadas.get())
@@ -259,7 +271,7 @@ class FluxosEndToEndTest {
     @Test fun execucoesSeguidasNaoVazamValorNemEstado() = runBlocking {
         semear(listOf(ouvir), emptyList())
         repeat(2) { vez ->
-            chamadas.clear()
+            chamadas.clear(); finais.clear()
             instrumentation.runOnMainSync { KeyFlowController.updateFluxo(EstadoExecucao.Ocioso) }
             rodarAgora(ouvir.id)
             assertEquals("vez $vez", EstadoExecucao.Concluido(ouvir.id), terminou(ouvir.id))
