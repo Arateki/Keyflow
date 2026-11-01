@@ -305,8 +305,8 @@ Respondidas por ele em 29/10, 22:20 (viraram decisões): **Q1** (pausar/cancelar
 
 | Requirement | Story | Task | Status |
 | ----------- | ----- | ---- | ------ |
-| NTF-01 | P1-A | NTF-T12, NTF-T13 | Pending |
-| NTF-02 | P1-A | NTF-T12 | Pending |
+| NTF-01 | P1-A | NTF-T12, NTF-T13 | Implementing (feita: T12, Estado/Aparência/Interações); aba ainda Em breve, restante em T13 |
+| NTF-02 | P1-A | NTF-T12 | Verified (T12); permissão, pedido, mostrar e presença no painel |
 | NTF-03 | P1-A | NTF-T13 | Pending |
 | NTF-04 | P1-A | NTF-T13 | Pending |
 | NTF-05 | P1-B | NTF-T1, NTF-T9 | Implementing (feitas: T9) |
@@ -314,9 +314,9 @@ Respondidas por ele em 29/10, 22:20 (viraram decisões): **Q1** (pausar/cancelar
 | NTF-07 | P1-B | NTF-T4, NTF-T9 | Implementing (feitas: T9) |
 | NTF-08 | P1-B | NTF-T2 | Verified |
 | NTF-09 | P1-B | NTF-T4, NTF-T10 | Implementing (feitas: T10) |
-| NTF-10 | P1-B | NTF-T2, NTF-T3, NTF-T4, NTF-T10, NTF-T12 | Implementing (feitas: T10) |
-| NTF-11 | P1-B | NTF-T4, NTF-T10, NTF-T12, NTF-T20 | Implementing (feita: T10; catálogo e migração D14 verificados em 01/11: seletor → Nenhuma) |
-| NTF-12 | P1-B | NTF-T2, NTF-T12 | Implementing (feitas: T2) |
+| NTF-10 | P1-B | NTF-T2, NTF-T3, NTF-T4, NTF-T10, NTF-T12 | Verified (T10, T12); remapeamento de 1/2/3 toques, zero gravação aceito e aviso sem bloqueio |
+| NTF-11 | P1-B | NTF-T4, NTF-T10, NTF-T12, NTF-T20 | Implementing (feitas: T10, T12; catálogo nativo D14, aviso de Ler a tela e confirmação genérica verificados); extensão de Fluxos em T20 |
+| NTF-12 | P1-B | NTF-T2, NTF-T12 | Verified (T2, T12); cópia ao vivo somente leitura, Alternar/PTT sem inventar ação, congelar ao desligar e confirmação ao religar |
 | NTF-13 | P1-B | NTF-T9 | Verified |
 | NTF-14 | P1-B | NTF-T10 | Verified |
 | NTF-15 | P1-C | NTF-T3, NTF-T13 | Implementing (feitas: T3) |
@@ -326,9 +326,9 @@ Respondidas por ele em 29/10, 22:20 (viraram decisões): **Q1** (pausar/cancelar
 | NTF-19 | P1-D | NTF-T11, NTF-T13 | Implementing (feito: serviço em T11); painel em T13 |
 | NTF-20 | P1-D | NTF-T9, NTF-T11, NTF-T14 | Implementing (feitas: T9, T11); flag ongoing verificado; prova pré-14/bloqueio/Limpar tudo em T14 |
 | NTF-21 | P1-D | NTF-T9, NTF-T11 | Verified (T9, T11); mínima inicial/fallback/mostrar=false e primeiro plano não nulo |
-| NTF-22 | P1-D | NTF-T11, NTF-T12 | Implementing (feito: serviço em T11, porta de permissão negada); explicação/pedido na UI em T12 |
+| NTF-22 | P1-D | NTF-T11, NTF-T12 | Verified (T11, T12); porta de permissão negada no serviço e explicação/pedido no painel |
 | NTF-23 | P1-D | NTF-T11, NTF-T13 | Implementing (feito: canais em T11, MIN solicitado e promoção LOW do AOSP documentada); ajustes do sistema em T13 |
-| NTF-24 | P1-E | NTF-T7, NTF-T12 | Implementing (feitas: T7) |
+| NTF-24 | P1-E | NTF-T7, NTF-T12 | Verified (T7, T12); skins nativas/pagas travadas e pacotes filtrados por notificação, cópia somente leitura |
 | NTF-25 | P1-E | NTF-T6 | Verified |
 | NTF-26 | P1-E | NTF-T7 | Verified |
 | NTF-27 | P1-E | NTF-T7 | Verified |
@@ -344,17 +344,19 @@ Respondidas por ele em 29/10, 22:20 (viraram decisões): **Q1** (pausar/cancelar
 | NTF-37 | P1-G | NTF-T3 | Verified |
 | NTF-38 | P1-G | NTF-T3, NTF-T10 | Implementing (feitas: T10) |
 | NTF-39 | P1-H | NTF-T2, NTF-T3, NTF-T20 | Implementing (feitas: T3) |
-| NTF-40 | P2-I | NTF-T12, NTF-T13 (cada uma traz os seus textos) | Pending |
+| NTF-40 | P2-I | NTF-T12, NTF-T13 (cada uma traz os seus textos) | Implementing (feita: T12, textos e descrições PT/en/es, TranslationsTest 5/5); textos de T13 pendentes |
 | NTF-41 | P2-I | NTF-T2, NTF-T4, NTF-T5 | Implementing (feitas: T5) |
-| NTF-42 | P2-I | NTF-T11 | Verified (T11); 20 pedidos/1 s, último vence, geração/cancelamento, cache e render fora da main; mutação detectada |
+| NTF-42 | P2-I | NTF-T11 | Verified (T11 e P3 da T12); geração/coalescência, Binder fora da trava da main e fallback de Throwable com cancelamento preservado (15/15); mutação detectada |
 | NTF-43 | P2-I | NTF-T1, NTF-T14, NTF-T18 | Implementing (T1: emulador medido, cabe; aparelhos pendentes) |
 | NTF-44 | P2-I | NTF-T15 | Pending |
-| NTF-45 | P2-I | NTF-T9, NTF-T12 | Implementing (feitas: T9) |
+| NTF-45 | P2-I | NTF-T9, NTF-T12 | Verified (T9, T12); descrições traduzidas, ações do painel com alvos de 48 dp e estado além da cor |
 | NTF-46 | P2-I | NTF-T16 | Pending |
 | NTF-47 | P2-I | NTF-T19 | Pending |
 | NTF-48 | P1-I | NTF-T4, NTF-T9, NTF-T10 | Implementing (feitas: T9, T10) |
 | NTF-49 | P1-I | NTF-T5, NTF-T10, NTF-T14 | Implementing (feitas: T10) |
 | NTF-50 | P1-I | NTF-T1, NTF-T9, NTF-T14 | Implementing (feitas: T9) |
+
+Validação da T12 e P3: [lição de 01/11](../../project/licoes/2026-11-01-notificacao-d.md) (painel 14/14, compartilhados 18/18, serviço 14/14, JVM 3.183/3.183 e lint sem problemas). A promoção da aba e a prévia continuam na T13.
 
 **Coverage:** 50 requisitos, 50 mapeados em tasks, 0 sem task.
 **Status values:** Pending → In Design → In Tasks → Implementing → Verified.
