@@ -895,6 +895,7 @@ internal fun Dropdown(
     tag: String,
     modifier: Modifier = Modifier,
     display: (String) -> String = { it },
+    fieldModifier: Modifier = Modifier,
 ) {
     val palette = LocalKeyFlowPalette.current
     var expanded by remember { mutableStateOf(false) }
@@ -902,7 +903,7 @@ internal fun Dropdown(
         Eyebrow(label)
         Box {
             Row(
-                Modifier
+                Modifier.then(fieldModifier)
                     .fillMaxWidth()
                     .clickable { expanded = true }
                     .padding(top = 8.dp, bottom = 9.dp)

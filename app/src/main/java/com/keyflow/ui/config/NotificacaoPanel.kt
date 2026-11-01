@@ -1,5 +1,16 @@
 package com.keyflow.ui.config
 
+import android.app.NotificationManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings as AjustesAndroid
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.keyflow.overlay.OverlayService
+import com.keyflow.notificacao.app.NotificacaoDaOrbe
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,11 +55,20 @@ private fun rememberRepositorioNotificacao(): SettingsRepository {
 private class EdicaoNotificacao(val mudar: (ConfigNotificacao) -> ConfigNotificacao,
     val avisos: List<AvisoDeSubstituicao<AcaoDaOrbe>>)
 
-/** Porta real: só o JSON da notificação muda, por atualização atômica; a aba é ligada na T13. */
+/** Porta real: só o JSON da notificação muda; repor ao ficar visível nunca cria um serviço. */
 @Composable
 fun NotificacaoPanel(settings: Settings, notificationsGranted: Boolean, onRequestNotificationPermission: () -> Unit,
     onSettingsChange: (Settings) -> Unit, modifier: Modifier = Modifier, skinsUnlocked: Boolean = false,
     onUnlockSkins: () -> Unit = {}, repository: SettingsRepository = rememberRepositorioNotificacao()) {
+    val contexto = LocalContext.current
+    val dono = LocalLifecycleOwner.current
+    DisposableEffect(dono, contexto) {
+        val observador = LifecycleEventObserver { _, evento ->
+            if (evento == Lifecycle.Event.ON_RESUME) OverlayService.mostrarNotificacaoSeEmPrimeiroPlano(contexto)
+        }
+        dono.lifecycle.addObserver(observador)
+        onDispose { dono.lifecycle.removeObserver(observador) }
+    }
     val config by remember(repository) { repository.configNotificacaoFlow() }.collectAsStateOnMain(initial = null)
     val scope = rememberCoroutineScope()
     var erro by remember { mutableStateOf<String?>(null) }
@@ -62,12 +82,13 @@ fun NotificacaoPanel(settings: Settings, notificationsGranted: Boolean, onReques
     }, modifier, skinsUnlocked, onUnlockSkins, onSettingsChange, erro = erro)
 }
 
-/** NTF-T12: Estado, Aparência e Interações; sem prévia, tela bloqueada ou promoção da aba (T13). */
+/** NTF-T12/T13: painel completo, com a prévia da RemoteViews e os controles da notificação. */
 @Composable
 fun NotificacaoPanel(config: ConfigNotificacao, settings: Settings, notificationsGranted: Boolean,
     onRequestNotificationPermission: () -> Unit, atualizar: ((ConfigNotificacao) -> ConfigNotificacao) -> Unit,
     modifier: Modifier = Modifier, skinsUnlocked: Boolean = false, onUnlockSkins: () -> Unit = {},
     onSettingsChange: (Settings) -> Unit = {}, store: SkinPackStore = rememberSkinPackStore(), erro: String? = null) {
+    val contexto = LocalContext.current
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
     val configAtual by rememberUpdatedState(config)
@@ -92,11 +113,20 @@ fun NotificacaoPanel(config: ConfigNotificacao, settings: Settings, notification
             NotificacaoToggle(tr("Mostrar a notificação da orbe"), tr("Desligada: fica só uma notificação mínima enquanto o Android exigir."),
                 config.mostrar, { valor -> atualizar { it.copy(mostrar = valor) } }, "notificacao-mostrar")
             Text(if (settings.overlayModeEnabled) tr("Fica visível enquanto a orbe flutuante estiver ligada.") else tr("Fica visível só durante a gravação."), color = palette.muted)
+            NotificacaoPrevia(config, settings, skinsUnlocked, store)
             Text(tr("Aparência"), color = palette.fg)
             NotificacaoToggle(tr("Copiar a configuração da orbe principal"), tr("Skin e ações acompanham a orbe principal ao vivo."), config.copiarDaOrbePrincipal,
                 { copiar -> val origem = settingsAtuais; propor { atual -> if (copiar) atual.copy(copiarDaOrbePrincipal = true) else desligarCopia(atual, origem) } }, "notificacao-copiar")
             NotificacaoSkins(config, settings, skinsUnlocked, atualizar, onUnlockSkins, onSettingsChange, store)
             NotificacaoInteracoes(e) { toque = it }
+            Text(tr("Tela bloqueada"), color = palette.fg)
+            NotificacaoToggle(tr("Permitir controlar com a tela bloqueada"),
+                tr("Desligada: a orbe recusa o toque e avisa. Texto ditado nunca aparece."),
+                config.permitirComTelaBloqueada, { valor -> atualizar { it.copy(permitirComTelaBloqueada = valor) } }, "notificacao-tela-bloqueada")
+            Text(tr("Sistema"), color = palette.fg)
+            SecondaryButton(tr("Ajustes de notificação do sistema"), "notificacao-ajustes-sistema",
+                { abrirAjustesDaNotificacao(contexto) },
+                Modifier.heightIn(min = 48.dp).semantics { contentDescription = tr("Ajustes de notificação do sistema") })
             erro?.let { Text(it, color = palette.terracotta, modifier = Modifier.testTag("notificacao-erro")) }
         }
         val toqueEscolhido = toque
@@ -155,3 +185,20 @@ private fun NotificacaoToggle(label: String, sub: String, checked: Boolean, muda
 }
 private fun Modifier.notificacaoToggleable(checked: Boolean, mudar: (Boolean) -> Unit): Modifier =
     this.then(Modifier.toggleable(checked, role = androidx.compose.ui.semantics.Role.Switch, onValueChange = mudar))
+
+/** Android 7 não tem canais: abre os detalhes do app; do 8 em diante abre o canal real da orbe. */
+internal fun intentAjustesDaNotificacao(contexto: Context): Intent =
+    (if (Build.VERSION.SDK_INT >= 26) Intent(AjustesAndroid.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+        .putExtra(AjustesAndroid.EXTRA_APP_PACKAGE, contexto.packageName)
+        .putExtra(AjustesAndroid.EXTRA_CHANNEL_ID, NotificacaoDaOrbe.CANAL_ORBE)
+    else Intent(AjustesAndroid.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${contexto.packageName}")))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+private fun abrirAjustesDaNotificacao(contexto: Context) {
+    if (Build.VERSION.SDK_INT >= 26) {
+        val manager = contexto.getSystemService(NotificationManager::class.java)
+        // O botão também funciona antes de o serviço ter criado seu primeiro canal.
+        if (manager.getNotificationChannel(NotificacaoDaOrbe.CANAL_ORBE) == null) manager.createNotificationChannel(NotificacaoDaOrbe.canalDaOrbe())
+    }
+    contexto.startActivity(intentAjustesDaNotificacao(contexto))
+}

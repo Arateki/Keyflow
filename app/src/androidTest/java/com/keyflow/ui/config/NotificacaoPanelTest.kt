@@ -1,5 +1,23 @@
 package com.keyflow.ui.config
 
+import androidx.activity.compose.LocalActivityResultRegistryOwner
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
+import android.content.res.Configuration
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.ColorDrawable
+import android.view.View
+import android.widget.Chronometer
+import android.widget.FrameLayout
+import android.widget.ImageView
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import com.keyflow.R
+import com.keyflow.notificacao.app.ProvedorDeAparencia
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.getValue
@@ -38,12 +56,14 @@ class NotificacaoPanelTest {
     private val contexto get() = InstrumentationRegistry.getInstrumentation().targetContext
     private lateinit var pasta: File
     private lateinit var store: SkinPackStore
+    private var raiz: View? = null
     private class Dados(inicial: ConfigNotificacao = ConfigNotificacao(), origem: Settings = Settings()) {
         var config by mutableStateOf(inicial)
         var settings by mutableStateOf(origem)
         var escritas = 0
         var pedidos = 0
         var desbloqueios = 0
+        var noite by mutableStateOf(false)
         fun salvar(f: (ConfigNotificacao) -> ConfigNotificacao) { config = f(config); escritas++ }
     }
     @Before fun preparar() {
@@ -52,11 +72,33 @@ class NotificacaoPanelTest {
         store = SkinPackStore(File(pasta, "skins"))
     }
     @After fun limpar() { pasta.deleteRecursively(); AppLocale.pinned = null }
-    private fun mostrar(d: Dados, permissao: Boolean = true, pagas: Boolean = false, dark: Boolean = false) {
-        regra.setContent { KeyFlowTheme(dark = dark) { Box(Modifier.width(360.dp)) {
-            NotificacaoPanel(d.config, d.settings, permissao, { d.pedidos++ }, d::salvar, skinsUnlocked = pagas,
-                onUnlockSkins = { d.desbloqueios++ }, onSettingsChange = { d.settings = it }, store = store)
-        } } }
+    private fun mostrar(d: Dados, permissao: Boolean = true, pagas: Boolean = false, dark: Boolean = false,
+        contextoDaTela: Context = contexto) {
+        regra.setContent {
+            val registro = checkNotNull(LocalActivityResultRegistryOwner.current)
+            val view = LocalView.current
+            SideEffect { raiz = view.rootView }
+            val configuracao = Configuration(LocalConfiguration.current).apply {
+                uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
+                    if (d.noite) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
+            }
+            CompositionLocalProvider(LocalActivityResultRegistryOwner provides registro, LocalConfiguration provides configuracao, LocalContext provides contextoDaTela) {
+                KeyFlowTheme(dark = dark) { Box(Modifier.width(360.dp)) {
+                    NotificacaoPanel(d.config, d.settings, permissao, { d.pedidos++ }, d::salvar, skinsUnlocked = pagas,
+                        onUnlockSkins = { d.desbloqueios++ }, onSettingsChange = { d.settings = it }, store = store)
+                } }
+            }
+        }
+    }
+    private fun linha(): View? = raiz?.findViewWithTag<FrameLayout>("notificacao-previa-android")?.let {
+        if (it.childCount == 1) it.getChildAt(0) else null
+    }
+    private fun esperarLinha(condicao: (View) -> Boolean = { true }) {
+        regra.waitUntil(10_000) {
+            var pronta = false
+            regra.runOnIdle { pronta = linha()?.let(condicao) == true }
+            pronta
+        }
     }
     private fun no(tag: String) = regra.onNodeWithTag(tag, useUnmergedTree = true)
     private fun clicar(tag: String) { val n = no(tag); if (!n.isDisplayed()) n.performScrollTo(); n.assertIsEnabled().performClick() }
@@ -187,4 +229,81 @@ class NotificacaoPanelTest {
             assertEquals(settingsAntes, runBlocking { repo.rawPreferencesOnce().asMap().filterKeys { it.name != "notification_config_json" } })
         } finally { runBlocking { repo.atualizarNotificacao { anterior } } }
     }
+    @Test fun previaRealMudaOsSeteEstadosComOsBotoesCertos() {
+        mostrar(Dados())
+        val casos = listOf(
+            Triple("GRAVANDO", "Pausar gravação", "Descartar gravação"),
+            Triple("PAUSADA", "Retomar gravação", "Descartar gravação"),
+            Triple("TRANSCREVENDO", null, "Descartar gravação"),
+            Triple("CANCELANDO", null, "Desfazer descarte"),
+            Triple("ERRO", null, null), Triple("VISAO", null, "Encerrar a leitura da tela"), Triple("OCIOSA", null, null),
+        )
+        for ((estado, esquerda, direita) in casos) {
+            clicar("notificacao-previa-estado"); clicar("notificacao-previa-estado-$estado")
+            esperarLinha { view ->
+                val a = view.findViewById<View>(R.id.notif_btn_esq)
+                val b = view.findViewById<View>(R.id.notif_btn_dir)
+                a.visibility == (if (esquerda == null) View.INVISIBLE else View.VISIBLE) &&
+                    b.visibility == (if (direita == null) View.INVISIBLE else View.VISIBLE) &&
+                    (esquerda == null || a.contentDescription.toString() == esquerda) &&
+                    (direita == null || b.contentDescription.toString() == direita)
+            }
+            regra.runOnIdle {
+                val view = linha()!!
+                val imagem = view.findViewById<ImageView>(R.id.notif_orb)
+                assertTrue(imagem.drawable is BitmapDrawable)
+                assertFalse(imagem.performClick())
+                for (id in listOf(R.id.notif_btn_esq, R.id.notif_btn_dir)) assertFalse(view.findViewById<View>(id).performClick())
+            }
+        }
+    }
+    @Test fun previaCongelaOCronometroEmDozeSegundos() {
+        mostrar(Dados())
+        clicar("notificacao-previa-estado"); clicar("notificacao-previa-estado-GRAVANDO")
+        esperarLinha { it.findViewById<Chronometer>(R.id.notif_time).visibility == View.VISIBLE }
+        regra.runOnIdle { assertEquals("00:12", linha()!!.findViewById<Chronometer>(R.id.notif_time).text.toString()) }
+        val fim = android.os.SystemClock.uptimeMillis() + 1_100
+        regra.waitUntil(5_000) { android.os.SystemClock.uptimeMillis() >= fim }
+        regra.runOnIdle { assertEquals("00:12", linha()!!.findViewById<Chronometer>(R.id.notif_time).text.toString()) }
+    }
+    @Test fun previaSegueSkinEfetivaEModoDoSistemaMesmoComTemaDoAppDiferente() {
+        val d = Dados(); mostrar(d, dark = true)
+        esperarLinha { (it.background as? ColorDrawable)?.color == ProvedorDeAparencia.FUNDO_CLARO }
+        var anterior: android.graphics.Bitmap? = null
+        regra.runOnIdle { anterior = (linha()!!.findViewById<ImageView>(R.id.notif_orb).drawable as BitmapDrawable).bitmap }
+        regra.runOnIdle { d.noite = true }
+        esperarLinha { (it.background as? ColorDrawable)?.color == ProvedorDeAparencia.FUNDO_ESCURO }
+        regra.runOnIdle { d.settings = d.settings.copy(orbSkin = "sistema") }
+        esperarLinha { (it.background as? ColorDrawable)?.color != ProvedorDeAparencia.FUNDO_ESCURO &&
+            !(it.findViewById<ImageView>(R.id.notif_orb).drawable as BitmapDrawable).bitmap.sameAs(anterior!!) }
+        regra.runOnIdle { assertEquals("sistema", d.settings.orbSkin); assertEquals(0, d.escritas) }
+    }
+    @Test fun telaBloqueadaComecaDesligadaEPersisteSemAlterarOutrosCampos() {
+        val d = Dados(); mostrar(d)
+        assertFalse(d.config.permitirComTelaBloqueada)
+        clicar("notificacao-tela-bloqueada")
+        assertEquals(ConfigNotificacao(permitirComTelaBloqueada = true), d.config)
+        no("notificacao-tela-bloqueada").assertHeightIsAtLeast(48.dp)
+    }
+    @Test fun ajustesDisparamOIntentDoCanalSemAbrirUmaJanelaDoSistema() {
+        val capturados = mutableListOf<Intent>()
+        val ctx = object : ContextWrapper(contexto) {
+            override fun startActivity(intent: Intent) { capturados += intent }
+        }
+        mostrar(Dados(), contextoDaTela = ctx)
+        clicar("notificacao-ajustes-sistema")
+        assertEquals(1, capturados.size)
+        val intent = capturados.single()
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            assertEquals(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS, intent.action)
+            assertEquals(contexto.packageName, intent.getStringExtra(android.provider.Settings.EXTRA_APP_PACKAGE))
+            assertEquals("keyflow_overlay", intent.getStringExtra(android.provider.Settings.EXTRA_CHANNEL_ID))
+            assertNotNull(contexto.getSystemService(android.app.NotificationManager::class.java).getNotificationChannel("keyflow_overlay"))
+        } else {
+            assertEquals(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, intent.action)
+            assertEquals("package:${contexto.packageName}", intent.dataString)
+        }
+        no("notificacao-ajustes-sistema").assertContentDescriptionEquals("Ajustes de notificação do sistema")
+    }
+
 }

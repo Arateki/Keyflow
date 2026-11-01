@@ -1,6 +1,8 @@
 package com.keyflow.notificacao.app
 
 import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -213,6 +215,12 @@ class NotificacaoDaOrbe(
     }
 
     companion object {
+        const val CANAL_ORBE = "keyflow_overlay"
+        /** A tela e o serviço criam o mesmo canal silencioso, sem redefinir escolhas existentes. */
+        @androidx.annotation.RequiresApi(26)
+        fun canalDaOrbe(): NotificationChannel = NotificationChannel(CANAL_ORBE, "KeyFlow", NotificationManager.IMPORTANCE_LOW)
+            .apply { setSound(null, null); enableVibration(false) }
+
         const val CANAL_MINIMO = "keyflow_overlay_min"
 
         /** O extra do clique de um botão: o nome do [Botao]. */

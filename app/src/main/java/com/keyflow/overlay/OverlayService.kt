@@ -1564,7 +1564,7 @@ class OverlayService : Service() {
 
     @androidx.annotation.RequiresApi(Build.VERSION_CODES.O)
     internal fun canaisDaNotificacao(): List<NotificationChannel> = listOf(
-        NotificationChannel(NOTIFICATION_CHANNEL_ID, "KeyFlow", NotificationManager.IMPORTANCE_LOW),
+        NotificacaoDaOrbe.canalDaOrbe(),
         NotificationChannel(NotificacaoDaOrbe.CANAL_MINIMO, "KeyFlow (mínimo)", NotificationManager.IMPORTANCE_MIN),
     ).onEach { it.setSound(null, null); it.enableVibration(false) }
 
@@ -1633,7 +1633,7 @@ class OverlayService : Service() {
         internal var visionProjectionStartedForTest: ((MediaProjection) -> Unit)? = null
         internal var visionProjectionTypeForTest: ((Int) -> Unit)? = null
 
-        private const val NOTIFICATION_CHANNEL_ID = "keyflow_overlay"
+        private const val NOTIFICATION_CHANNEL_ID = NotificacaoDaOrbe.CANAL_ORBE
         private const val NOTIFICATION_ID = 1001
 
         const val ACTION_RUN_FLOW = "com.keyflow.overlay.RUN_FLOW"
