@@ -518,6 +518,7 @@ internal fun SecondaryButton(
     modifier: Modifier = Modifier,
     icon: com.keyflow.ui.icons.KfIconSpec? = null,
     accent: Color = LocalKeyFlowPalette.current.fg,
+    enabled: Boolean = true,
 ) {
     val palette = LocalKeyFlowPalette.current
     Row(
@@ -525,7 +526,7 @@ internal fun SecondaryButton(
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .border(1.dp, palette.line, RoundedCornerShape(14.dp))
-            .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) {
+            .clickable(enabled = enabled, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) {
                 onClick()
             }
             .testTag(tag)

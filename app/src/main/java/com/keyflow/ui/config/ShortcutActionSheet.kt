@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,6 +32,9 @@ import androidx.compose.ui.unit.sp
 import com.keyflow.core.OrbShortcutAction
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
+
+/** Uma ação de outro catálogo que reutiliza a folha de atalhos. */
+data class OpcaoDeAtalho(val id: String, val label: String, val descricao: String, val selected: Boolean)
 
 const val SHORTCUT_SHEET_TAG = "shortcut-action-sheet"
 
@@ -63,6 +69,9 @@ fun ShortcutActionSheet(
     onBlockedKeyboard: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    catalogo: List<OpcaoDeAtalho>? = null,
+    explicacao: String? = null,
+    onCatalogoSelect: ((String) -> Unit)? = null,
 ) {
     if (taps == null) return
     val palette = LocalKeyFlowPalette.current
@@ -95,7 +104,7 @@ fun ShortcutActionSheet(
                 letterSpacing = (-0.4).sp,
             )
             Text(
-                if (taps == 1) {
+                explicacao ?: if (taps == 1) {
                     tr("Escolha a ação ao tocar 1 vez na orbe (apenas no modo Push-to-talk, onde o toque é livre).")
                 } else {
                     tr("Escolha a ação ao tocar %d vezes na orbe (em repouso ou pausada).", taps)
@@ -108,7 +117,10 @@ fun ShortcutActionSheet(
                 modifier = Modifier.padding(top = 6.dp, bottom = 6.dp),
             )
 
-            listOf(
+            if (catalogo != null) catalogo.forEach { opcao ->
+                ActionRow(OrbShortcutAction.NONE, opcao.selected, false,
+                    { onCatalogoSelect?.invoke(opcao.id); onDismiss() }, opcao)
+            } else listOf(
                 OrbShortcutAction.NONE,
                 OrbShortcutAction.TOGGLE_KEYBOARD,
                 OrbShortcutAction.SWITCH_IME,
@@ -140,6 +152,7 @@ private fun ActionRow(
     selected: Boolean,
     blocked: Boolean,
     onClick: () -> Unit,
+    opcao: OpcaoDeAtalho? = null,
 ) {
     val palette = LocalKeyFlowPalette.current
     val noRipple = remember { MutableInteractionSource() }
@@ -155,7 +168,9 @@ private fun ActionRow(
                 else Modifier.border(1.dp, palette.line, shape),
             )
             .clickable(interactionSource = noRipple, indication = null) { onClick() }
-            .testTag("shortcut-action-${action.name.lowercase()}")
+            .heightIn(min = 48.dp)
+            .semantics { contentDescription = opcao?.label ?: shortcutActionLabel(action) }
+            .testTag("shortcut-action-${opcao?.id ?: action.name.lowercase()}")
             .padding(horizontal = 16.dp, vertical = 14.dp)
             .then(if (blocked) Modifier.alpha(0.45f) else Modifier),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -164,7 +179,7 @@ private fun ActionRow(
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    shortcutActionLabel(action),
+                    opcao?.label ?: shortcutActionLabel(action),
                     color = palette.fg,
                     fontFamily = SpaceGrotesk,
                     fontWeight = FontWeight.Normal,
@@ -174,7 +189,7 @@ private fun ActionRow(
                 if (blocked) Eyebrow(tr("Indisponível"))
             }
             Text(
-                shortcutActionSub(action),
+                opcao?.descricao ?: shortcutActionSub(action),
                 color = palette.muted,
                 fontFamily = SpaceGrotesk,
                 fontWeight = FontWeight.Light,

@@ -464,12 +464,13 @@ private fun FeatureList(features: List<String>) {
  * [pulsing], anima um leve pulso de escala para chamar a atenção. Verde quando [granted]; senão âmbar.
  */
 @Composable
-private fun StatusChip(
+internal fun StatusChip(
     text: String,
     granted: Boolean,
     pulsing: Boolean,
     onClick: () -> Unit,
     tag: String,
+    modifier: Modifier = Modifier,
 ) {
     val palette = LocalKeyFlowPalette.current
     val accent = if (granted) palette.teal else palette.recordSoft
@@ -489,7 +490,7 @@ private fun StatusChip(
     // Compacta de propósito (Yan, 2026-09-28): em caixa-alta espaçada as etiquetas iam uma por linha e a
     // aba Modo deixava de caber na tela sem rolar. Em caixa normal cabem duas por linha no A32.
     Row(
-        Modifier
+        modifier
             .scale(scale)
             .clip(shape)
             .border(1.dp, accent.copy(alpha = 0.45f), shape)

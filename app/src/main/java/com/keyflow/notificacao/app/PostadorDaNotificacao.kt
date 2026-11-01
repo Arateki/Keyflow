@@ -59,26 +59,32 @@ class PostadorDaNotificacao<E : Any, N : Any>(
                 construir(estado)
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
-                falha(e); minima()
-            } catch (e: OutOfMemoryError) {
+            } catch (e: Throwable) {
                 falha(e); minima()
             }
-            synchronized(trava) {
-                if (g != geracao) return@synchronized
-                pronta = estado to notificacao
-                processada = g
-                if (!visibilidade.podePostar || publicado == estado) return@synchronized
-                // Serializa a entrega com Dispensou/SessaoTerminou; nunca publica um render atrasado.
-                try {
-                    if (permitida()) {
-                        publicar(notificacao)
-                        publicado = estado
-                        ultimaPublicada = notificacao
+            val entregar = synchronized(trava) {
+                if (g != geracao) false else {
+                    pronta = estado to notificacao
+                    visibilidade.podePostar && publicado != estado
+                }
+            }
+            try {
+                // Binder não segura a trava usada pela main, inclusive antes de startForeground.
+                // A permissão também pode bloquear: revalida a geração DEPOIS dela e antes de notify.
+                if (entregar && permitida() && synchronized(trava) { g == geracao && visibilidade.podePostar }) {
+                    publicar(notificacao)
+                    synchronized(trava) {
+                        if (g == geracao && visibilidade.podePostar) {
+                            publicado = estado
+                            ultimaPublicada = notificacao
+                        }
                         publicacoes++
                     }
-                } catch (e: Exception) { falha(e) }
-            }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) { falha(e) }
+            finally { synchronized(trava) { if (g == geracao) processada = g } }
         }
     }
 
@@ -91,11 +97,12 @@ class PostadorDaNotificacao<E : Any, N : Any>(
     }
 
     /** Nunca espera o desenho: é a notificação obrigatória usada por startForeground, mesmo sem permissão. */
-    fun inicial(estado: E): N = synchronized(trava) {
-        solicitar(estado)
-        val cache = pronta?.takeIf { it.first == estado }
-        inicialCompleta = cache?.first
-        (cache?.second ?: minima()).also { ultimaInicial = it }
+    fun inicial(estado: E): N {
+        val cache = synchronized(trava) {
+            solicitar(estado)
+            pronta?.takeIf { it.first == estado }.also { inicialCompleta = it?.first }?.second
+        }
+        return (cache ?: minima()).also { ultimaInicial = it }
     }
 
     fun evento(evento: EventoPresenca) = synchronized(trava) {

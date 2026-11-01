@@ -50,6 +50,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.data.Settings
+import com.keyflow.notificacao.ConfigNotificacao
+import androidx.compose.foundation.layout.heightIn
 import com.keyflow.i18n.tr
 import com.keyflow.ime.KeyboardSkin
 import com.keyflow.skins.ImportReport
@@ -74,7 +76,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Qual superfície a seção veste: o teclado (aba Teclado) ou a orbe (aba Sobrepor). Cada aba lista só os pacotes que têm a peça dela. */
-enum class SkinPackSurface { KEYBOARD, ORB }
+enum class SkinPackSurface { KEYBOARD, ORB, NOTIFICACAO }
 
 const val SKIN_PACK_IMPORT_TAG = "skin-pack-import"
 const val SKIN_PACK_REPORT_TAG = "skin-pack-report"
@@ -107,26 +109,34 @@ fun SkinPacksSection(
     onSettingsChange: (Settings) -> Unit,
     modifier: Modifier = Modifier,
     store: SkinPackStore = rememberSkinPackStore(),
+    notificacao: ConfigNotificacao? = null,
+    onNotificacaoChange: (((ConfigNotificacao) -> ConfigNotificacao) -> Unit)? = null,
+    enabled: Boolean = true,
 ) {
     val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
     // O seletor devolve o resultado depois (outra Activity): lê sempre o ajuste e o callback mais novos.
     val currentSettings by rememberUpdatedState(settings)
     val currentChange by rememberUpdatedState(onSettingsChange)
+    val mudarNotificacao by rememberUpdatedState(onNotificacaoChange)
     val cards by rememberSkinPackCards(store)
     var importing by remember { mutableStateOf(false) }
     var outcome by remember { mutableStateOf<SkinImportOutcome?>(null) }
     var confirming by remember { mutableStateOf<String?>(null) }
+    androidx.compose.runtime.LaunchedEffect(enabled) { if (!enabled) confirming = null }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         // Cancelar o seletor devolve `null`: nada foi lido, nada foi instalado.
         if (uri == null) return@rememberLauncherForActivityResult
         importing = true
-        scope.launch {
+        scope.launch(Dispatchers.Main.immediate) {
             val result = importSkinPack(context, store, uri)
             importing = false
             val adjusted = settingsAfterInstall(currentSettings, result)
             if (adjusted != currentSettings) currentChange(adjusted)
+            if (result.installed && !result.hasNotification) mudarNotificacao?.invoke { atual ->
+                if (atual.skin == result.skinId) atual.copy(skin = ConfigNotificacao.SKIN_PADRAO) else atual
+            }
             outcome = result
         }
     }
@@ -134,20 +144,32 @@ fun SkinPacksSection(
     SkinPacksContent(
         surface = surface,
         cards = cards.orEmpty(),
-        selectedSkinId = if (surface == SkinPackSurface.KEYBOARD) settings.keyboardSkin else settings.orbSkin,
+        selectedSkinId = when (surface) {
+            SkinPackSurface.KEYBOARD -> settings.keyboardSkin
+            SkinPackSurface.ORB -> settings.orbSkin
+            SkinPackSurface.NOTIFICACAO -> notificacao?.skin ?: ConfigNotificacao.SKIN_PADRAO
+        },
+        enabled = enabled,
         importing = importing,
         confirmingId = confirming,
-        onImport = { if (!importing) picker.launch(SKIN_PACK_MIME_TYPES) },
-        onSelect = { card ->
+        onImport = { if (enabled && !importing) picker.launch(SKIN_PACK_MIME_TYPES) },
+        onSelect = selecionar@{ card ->
+            if (!enabled) return@selecionar
+            if (surface == SkinPackSurface.NOTIFICACAO) {
+                mudarNotificacao?.invoke { atual -> if (atual.copiarDaOrbePrincipal) atual else atual.copy(skin = card.skinId) }
+                return@selecionar
+            }
             val current = currentSettings
             currentChange(
                 if (surface == SkinPackSurface.KEYBOARD) current.copy(keyboardSkin = card.skinId) else current.copy(orbSkin = card.skinId),
             )
         },
-        onRemoveRequest = { confirming = it.id },
+        onRemoveRequest = { if (enabled) confirming = it.id },
         onRemoveCancel = { confirming = null },
-        onRemoveConfirm = { card ->
+        onRemoveConfirm = remover@{ card ->
+            if (!enabled) return@remover
             confirming = null
+            mudarNotificacao?.invoke { atual -> if (atual.skin == card.skinId) atual.copy(skin = ConfigNotificacao.SKIN_PADRAO) else atual }
             // Primeiro o ajuste, depois o pacote: ninguém fica apontando para uma skin que já não existe (R1).
             val adjusted = settingsAfterRemoval(currentSettings, card.skinId)
             if (adjusted != currentSettings) currentChange(adjusted)
@@ -210,6 +232,7 @@ internal class SkinImportOutcome(
     val packName: String? = null,
     val hasOrb: Boolean = false,
     val hasKeyboard: Boolean = false,
+    val hasNotification: Boolean = false,
 ) {
     val report: ImportReport get() = result.report
     val installed: Boolean get() = result.installed
@@ -241,7 +264,7 @@ internal suspend fun importSkinPack(
         failedInstall(tr("Não foi possível importar a skin: %s", e.message ?: e.javaClass.simpleName))
     }
     val pack = result.packId?.let { runCatching { store.load(it) }.getOrNull() }
-    SkinImportOutcome(fileName, result, pack?.name, pack?.hasOrb ?: false, pack?.hasKeyboard ?: false)
+    SkinImportOutcome(fileName, result, pack?.name, pack?.hasOrb ?: false, pack?.hasKeyboard ?: false, pack?.hasNotification ?: false)
 }
 
 private fun failedInstall(message: String) = InstallResult(ImportReport(errors = listOf(message)), packId = null)
@@ -272,6 +295,8 @@ internal class SkinPackCard(
     val hasKeyboard: Boolean,
     val orbPreview: ImageBitmap?,
     val keyboardPreview: ImageBitmap?,
+    val hasNotification: Boolean = false,
+    val notificationPreview: ImageBitmap? = null,
 )
 
 /** O tamanho da miniatura do cartão (a mesma para o teclado e a orbe). */
@@ -297,6 +322,8 @@ private fun cardOf(pack: SkinPack, width: Int, height: Int) = SkinPackCard(
     hasKeyboard = pack.hasKeyboard,
     orbPreview = PackPreview.orb(pack, height)?.asImageBitmap(),
     keyboardPreview = PackPreview.keyboard(pack, width, height)?.asImageBitmap(),
+    hasNotification = pack.hasNotification,
+    notificationPreview = PackPreview.notification(pack, height)?.asImageBitmap(),
 )
 
 /**
@@ -333,9 +360,14 @@ internal fun SkinPacksContent(
     onRemoveCancel: () -> Unit,
     onRemoveConfirm: (SkinPackCard) -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     val palette = LocalKeyFlowPalette.current
-    val shown = cards.filter { if (surface == SkinPackSurface.KEYBOARD) it.hasKeyboard else it.hasOrb }
+    val shown = cards.filter { when (surface) {
+        SkinPackSurface.KEYBOARD -> it.hasKeyboard
+        SkinPackSurface.ORB -> it.hasOrb
+        SkinPackSurface.NOTIFICACAO -> it.hasNotification
+    } }
     Column(modifier.fillMaxWidth()) {
         HairlineDivider()
         Column(Modifier.fillMaxWidth().padding(top = 15.dp, bottom = 16.dp)) {
@@ -343,6 +375,8 @@ internal fun SkinPacksContent(
             SettingSub(
                 if (surface == SkinPackSurface.KEYBOARD) {
                     tr("Importe um pacote .zip de SVGs com o seu teclado: faces das teclas e fundo.")
+                } else if (surface == SkinPackSurface.NOTIFICACAO) {
+                    tr("Importe um pacote .zip com desenhos para a notificação.")
                 } else {
                     tr("Importe um pacote .zip de SVGs com a sua orbe: um desenho por frame e por estado.")
                 },
@@ -352,8 +386,9 @@ internal fun SkinPacksContent(
                 text = if (importing) tr("Importando…") else tr("Importar skin"),
                 tag = SKIN_PACK_IMPORT_TAG,
                 onClick = onImport,
-                modifier = Modifier.padding(top = 12.dp),
+                modifier = Modifier.padding(top = 12.dp).then(if (surface == SkinPackSurface.NOTIFICACAO) Modifier.heightIn(min = 48.dp).semantics { contentDescription = tr("Importar skin") } else Modifier),
                 icon = KfIcons.Plus,
+                enabled = enabled,
             )
             for (card in shown) {
                 SkinPackCardRow(
@@ -361,6 +396,7 @@ internal fun SkinPacksContent(
                     surface = surface,
                     selected = card.skinId == selectedSkinId,
                     confirming = card.id == confirmingId,
+                    enabled = enabled,
                     onSelect = { onSelect(card) },
                     onRemoveRequest = { onRemoveRequest(card) },
                     onRemoveCancel = onRemoveCancel,
@@ -381,6 +417,7 @@ private fun SkinPackCardRow(
     onRemoveRequest: () -> Unit,
     onRemoveCancel: () -> Unit,
     onRemoveConfirm: () -> Unit,
+    enabled: Boolean = true,
 ) {
     val palette = LocalKeyFlowPalette.current
     val shape = RoundedCornerShape(12.dp)
@@ -390,7 +427,8 @@ private fun SkinPackCardRow(
                 .fillMaxWidth()
                 .clip(shape)
                 .border(if (selected) 1.5.dp else 1.dp, if (selected) palette.fg else palette.line, shape)
-                .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect)
+                .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onSelect)
+                .semantics { contentDescription = card.name }
                 .testTag(skinPackCardTag(card.id))
                 .padding(start = 8.dp, top = 8.dp, bottom = 8.dp, end = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -407,7 +445,7 @@ private fun SkinPackCardRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    listOfNotNull(card.author, partsLabel(card)).joinToString(" · "),
+                    listOfNotNull(card.author, if (surface == SkinPackSurface.NOTIFICACAO) tr("Notificação") else partsLabel(card)).joinToString(" · "),
                     color = palette.muted,
                     fontFamily = SpaceGrotesk,
                     fontWeight = FontWeight.Light,
@@ -420,9 +458,9 @@ private fun SkinPackCardRow(
             val removeLabel = tr("Remover %s", card.name)
             Box(
                 Modifier
-                    .size(34.dp)
+                    .size(if (surface == SkinPackSurface.NOTIFICACAO) 48.dp else 34.dp)
                     .clip(CircleShape)
-                    .clickable(role = Role.Button, onClick = onRemoveRequest)
+                    .clickable(enabled = enabled, role = Role.Button, onClick = onRemoveRequest)
                     .semantics { contentDescription = removeLabel }
                     .testTag(skinPackRemoveTag(card.id)),
                 contentAlignment = Alignment.Center,
@@ -447,8 +485,8 @@ private fun SkinPackCardRow(
                     fontSize = 12.sp,
                 )
                 Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                    PillAction(tr("Cancelar"), SKIN_PACK_REMOVE_NO_TAG, palette.muted, onRemoveCancel)
-                    PillAction(tr("Remover"), SKIN_PACK_REMOVE_YES_TAG, palette.terracotta, onRemoveConfirm)
+                    PillAction(tr("Cancelar"), SKIN_PACK_REMOVE_NO_TAG, palette.muted, onRemoveCancel, surface == SkinPackSurface.NOTIFICACAO)
+                    PillAction(tr("Remover"), SKIN_PACK_REMOVE_YES_TAG, palette.terracotta, onRemoveConfirm, surface == SkinPackSurface.NOTIFICACAO)
                 }
             }
         }
@@ -468,9 +506,9 @@ private fun SkinPackPreview(card: SkinPackCard, surface: SkinPackSurface) {
     val palette = LocalKeyFlowPalette.current
     val shape = RoundedCornerShape(8.dp)
     val box = Modifier.size(width = PREVIEW_WIDTH, height = PREVIEW_HEIGHT).clip(shape).border(1.dp, palette.line2, shape)
-    if (surface == SkinPackSurface.ORB) {
+    if (surface != SkinPackSurface.KEYBOARD) {
         Box(box.background(palette.bg), contentAlignment = Alignment.Center) {
-            val preview = card.orbPreview
+            val preview = if (surface == SkinPackSurface.NOTIFICACAO) card.notificationPreview else card.orbPreview
             if (preview != null) Image(preview, contentDescription = null, modifier = Modifier.fillMaxHeight().aspectRatio(1f), contentScale = ContentScale.Fit)
         }
     } else {
@@ -483,7 +521,7 @@ private fun SkinPackPreview(card: SkinPackCard, surface: SkinPackSurface) {
 
 /** Botão de pílula da pergunta de remoção (o mesmo desenho dos "Cancelar"/"Apagar" das listas de modelos). */
 @Composable
-private fun PillAction(label: String, tag: String, color: Color, onClick: () -> Unit) {
+private fun PillAction(label: String, tag: String, color: Color, onClick: () -> Unit, alvoGrande: Boolean = false) {
     Text(
         label,
         color = color,
@@ -492,6 +530,8 @@ private fun PillAction(label: String, tag: String, color: Color, onClick: () -> 
         fontSize = 11.sp,
         letterSpacing = 0.2.sp,
         modifier = Modifier
+            .then(if (alvoGrande) Modifier.heightIn(min = 48.dp) else Modifier)
+            .semantics { contentDescription = label }
             .clip(RoundedCornerShape(50))
             .border(1.dp, color.copy(alpha = 0.45f), RoundedCornerShape(50))
             .clickable(onClick = onClick)
