@@ -278,13 +278,12 @@ class ConfigScreenTest {
 
     @Test
     fun deferredTabsShowComingSoonCardWithoutControls() {
-        // Estas abas continuam na navegação, mas não expõem controles antes da entrega do recurso (a Fluxos saiu: FLX-T22).
+        // Computador continua sem controles; Fluxos (FLX-T22) e Notificação (NTF-T13) já têm painel.
         val h = Harness()
         rule.setContent { h.Content() }
 
         val tabs = listOf(
             ConfigTab.COMPUTADOR to "Computador",
-            ConfigTab.NOTIFICACAO to "Notificação",
         )
         for ((tab, title) in tabs) {
             rule.onNodeWithTag(tabTag(tab)).performClick()
@@ -295,6 +294,23 @@ class ConfigScreenTest {
             rule.onAllNodes(hasAnyAncestor(hasTestTag(panelTag(tab))) and hasClickAction()).assertCountEquals(0)
             rule.onAllNodes(hasAnyAncestor(hasTestTag(panelTag(tab))) and hasSetTextAction()).assertCountEquals(0)
         }
+    }
+
+    @Test
+    fun notificacaoAbrePainelCompletoSemEmBreveNemAjudaAntesDaT16() {
+        val h = Harness().also { it.permissions = allGranted.copy(notificationsGranted = false) }
+        rule.setContent { h.Content() }
+        rule.onNodeWithTag(tabTag(ConfigTab.NOTIFICACAO)).performClick()
+        rule.waitUntil(10_000) { rule.onAllNodesWithTag(NOTIFICACAO_PANEL_TAG).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag(NOTIFICACAO_PANEL_TAG).assertIsDisplayed()
+        rule.onAllNodesWithTag(COMING_SOON_LABEL_TAG).assertCountEquals(0)
+        rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals("Notificação")
+        rule.onAllNodesWithTag(HEADER_TAB_HELP_TAG).assertCountEquals(0)
+        rule.onNodeWithTag("notificacao-permissao").performClick()
+        rule.runOnIdle { assertEquals(1, h.notificationPermissionRequests) }
+        rule.onNodeWithTag("notificacao-previa").assertExists()
+        rule.onNodeWithTag("notificacao-tela-bloqueada").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag("notificacao-ajustes-sistema").performScrollTo().assertIsDisplayed()
     }
 
     @Test

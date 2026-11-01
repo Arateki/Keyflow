@@ -535,8 +535,15 @@ fun ConfigScreen(
                         } else {
                             ComingSoonPanel()
                         }
-                        ConfigTab.COMPUTADOR,
-                        ConfigTab.NOTIFICACAO -> ComingSoonPanel()
+                        ConfigTab.COMPUTADOR -> ComingSoonPanel()
+                        ConfigTab.NOTIFICACAO -> NotificacaoPanel(
+                            settings = settings,
+                            notificationsGranted = permissions.notificationsGranted,
+                            onRequestNotificationPermission = onRequestNotificationPermission,
+                            onSettingsChange = ::recordSettingsChange,
+                            skinsUnlocked = skinsUnlocked,
+                            onUnlockSkins = { if (!monetizationDisabled) unlockOpen = true },
+                        )
                         ConfigTab.PRIVACIDADE -> PrivacyPanel(
                             settings = settings,
                             adsController = adsController,
