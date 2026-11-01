@@ -82,11 +82,12 @@ class ComputadorDialogosTest {
         val p = PedidoDeInteracao.Senha()
         regra.setContent { KeyFlowTheme(dark = false) { PedirSenha(p) } }
         no("computador-senha").performTextReplacement("SENHA-FALSA-SENTINELA")
+        no("computador-senha").performTextInput("-digitada")
         varrerSegredo("SENHA-FALSA-SENTINELA")
         no("computador-senha").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.InputText))
         regra.onNodeWithText("SENHA-FALSA-SENTINELA", useUnmergedTree = true).assertDoesNotExist()
         no("computador-senha-continuar").performClick()
-        assertEquals("SENHA-FALSA-SENTINELA", runBlocking { p.resposta.await() })
+        assertEquals("SENHA-FALSA-SENTINELA-digitada", runBlocking { p.resposta.await() })
     }
     @Test fun cancelarSenhaRecusaSemEntregarOTexto() {
         val p = PedidoDeInteracao.Senha()

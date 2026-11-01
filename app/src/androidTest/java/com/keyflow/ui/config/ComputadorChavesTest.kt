@@ -74,7 +74,7 @@ class ComputadorChavesTest {
     private fun clicar(tag: String) {
         val alvo = no(tag)
         if (!alvo.isDisplayed()) alvo.performScrollTo()
-        alvo.performClick()
+        alvo.assertIsEnabled().performClick()
     }
     private fun digitar(tag: String, valor: String) = no(tag).performScrollTo().performTextReplacement(valor)
     private fun texto(valor: String) = regra.onNodeWithText(valor, useUnmergedTree = true)

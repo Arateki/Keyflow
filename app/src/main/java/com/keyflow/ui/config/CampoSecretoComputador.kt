@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.requestFocus
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setText
+import androidx.compose.ui.semantics.insertTextAtCursor
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.keyflow.ui.theme.LocalKeyFlowPalette
@@ -40,21 +41,23 @@ internal class SegredoDigitado {
     private var caracteres = CharArray(0)
     var revisao by mutableIntStateOf(0)
         private set
-    val vazio: Boolean get() = caracteres.isEmpty()
+    var vazio by mutableStateOf(true)
+        private set
     fun copiar(): CharArray = caracteres.copyOf()
     fun substituir(novo: CharArray) {
         caracteres.fill('\u0000')
         caracteres = novo.copyOf()
+        vazio = caracteres.isEmpty()
         revisao++
     }
-    fun limpar() { caracteres.fill('\u0000'); caracteres = CharArray(0); revisao++ }
+    fun limpar() { caracteres.fill('\u0000'); caracteres = CharArray(0); vazio = true; revisao++ }
     override fun toString() = "SegredoDigitado(***)"
 }
 
 /**
  * Campos Compose de senha também publicam InputText sem a transformação visual. Esta ponte nativa
  * mascara TODOS os caracteres (inclusive o último), exclui a árvore nativa da acessibilidade/autofill
- * e oferece só rótulo, password e SetText na árvore Compose: nenhuma propriedade contém o segredo.
+ * e oferece rótulo, máscara, foco e ações de edição no Compose: nenhuma propriedade contém o segredo.
  */
 @Composable
 internal fun CampoSecretoComputador(label: String, segredo: SegredoDigitado, tag: String, variasLinhas: Boolean = false) {
@@ -84,8 +87,23 @@ internal fun CampoSecretoComputador(label: String, segredo: SegredoDigitado, tag
                     }
                     setText { valor ->
                         val copia = valor.text.toCharArray()
-                        try { segredo.substituir(copia) } finally { copia.fill('\u0000') }
+                        try {
+                            val view = campo[0]
+                            if (view == null) segredo.substituir(copia)
+                            else { view.setText(copia, 0, copia.size); view.setSelection(copia.size) }
+                        } finally { copia.fill('\u0000') }
                         true
+                    }
+                    insertTextAtCursor { valor ->
+                        val view = campo[0]
+                        if (view == null) false else {
+                            val a = view.selectionStart.coerceIn(0, view.length())
+                            val b = view.selectionEnd.coerceIn(0, view.length())
+                            val inicio = minOf(a, b)
+                            view.text.replace(inicio, maxOf(a, b), valor.text)
+                            view.setSelection(inicio + valor.length)
+                            true
+                        }
                     }
                 },
             factory = { contexto ->
