@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,6 +28,7 @@ import com.keyflow.computador.app.texto
 import com.keyflow.computador.ssh.CausaSsh
 import com.keyflow.i18n.tr
 import com.keyflow.ui.common.collectAsStateOnMain
+import com.keyflow.ui.theme.LocalKeyFlowPalette
 
 /** A ponte suspensa da conexão; ao sair da tela, todos os pedidos são recusados e os buffers apagados. */
 @Composable
@@ -51,7 +53,7 @@ fun ComputadorDialogos(interacao: InteracaoDoApp) {
 
 @Composable
 internal fun ConfirmarServidor(pedido: PedidoDeInteracao.ConfirmarServidor) {
-    AlertDialog(onDismissRequest = { pedido.resposta.complete(false) },
+    DialogoComputador(onDismissRequest = { pedido.resposta.complete(false) },
         modifier = Modifier.testTag("computador-confirmar-servidor"), title = { Text(tr("Confirmar servidor")) },
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("${pedido.host}:${pedido.porta}")
@@ -68,7 +70,7 @@ internal fun ConfirmarServidor(pedido: PedidoDeInteracao.ConfirmarServidor) {
 internal fun ServidorMudou(pedido: PedidoDeInteracao.ServidorMudou) {
     var segundoPasso by remember { mutableStateOf(false) }
     val focoCancelar = remember(segundoPasso) { FocusRequester() }
-    AlertDialog(onDismissRequest = { pedido.resposta.complete(false) }, modifier = Modifier.testTag("computador-servidor-mudou"),
+    DialogoComputador(onDismissRequest = { pedido.resposta.complete(false) }, modifier = Modifier.testTag("computador-servidor-mudou"),
         title = { Text(tr("A identificação deste servidor mudou.")) },
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("${pedido.host}:${pedido.porta}")
@@ -100,7 +102,7 @@ internal fun ServidorMudou(pedido: PedidoDeInteracao.ServidorMudou) {
 internal fun PedirSenha(pedido: PedidoDeInteracao.Senha) {
     val segredo = remember { SegredoDigitado() }
     DisposableEffect(pedido) { onDispose { segredo.limpar() } }
-    AlertDialog(onDismissRequest = { pedido.resposta.complete(null) }, title = { Text(tr("Senha do servidor")) },
+    DialogoComputador(onDismissRequest = { pedido.resposta.complete(null) }, title = { Text(tr("Senha do servidor")) },
         text = { CampoSecretoComputador(tr("Senha"), segredo, "computador-senha") },
         confirmButton = { TextButton({
             val copia = segredo.copiar()
@@ -114,7 +116,7 @@ internal fun PedirSenha(pedido: PedidoDeInteracao.Senha) {
 internal fun CodigoDeVerificacao(pedido: PedidoDeInteracao.Codigo) {
     val segredos = remember(pedido) { pedido.perguntas.map { SegredoDigitado() } }
     DisposableEffect(pedido) { onDispose { segredos.forEach { it.limpar() } } }
-    AlertDialog(onDismissRequest = { pedido.resposta.complete(null) }, title = { Text(tr("Código de verificação")) },
+    DialogoComputador(onDismissRequest = { pedido.resposta.complete(null) }, title = { Text(tr("Código de verificação")) },
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (pedido.nome.isNotBlank()) Text(pedido.nome)
             if (pedido.instrucao.isNotBlank()) Text(pedido.instrucao)
@@ -150,7 +152,7 @@ fun CausaSsh.orientacao(): String? = when (this) {
 fun ErroComputador(causa: CausaSsh, copiarPublica: (() -> Unit)? = null, fechar: () -> Unit) {
     // Cancelar a confiança encerra calado (CMP-21), sem apresentar um erro artificial.
     val mensagem = causa.texto() ?: return
-    AlertDialog(onDismissRequest = fechar, modifier = Modifier.testTag("computador-erro-ssh"), title = { Text(mensagem) },
+    DialogoComputador(onDismissRequest = fechar, modifier = Modifier.testTag("computador-erro-ssh"), title = { Text(mensagem) },
         text = { causa.orientacao()?.let { Text(it) } },
         confirmButton = {
             if (causa == CausaSsh.CHAVE_NAO_ACEITA && copiarPublica != null) {
@@ -158,4 +160,40 @@ fun ErroComputador(causa: CausaSsh, copiarPublica: (() -> Unit)? = null, fechar:
             } else TextButton(fechar) { Text(tr("OK")) }
         },
         dismissButton = { if (causa == CausaSsh.CHAVE_NAO_ACEITA && copiarPublica != null) TextButton(fechar) { Text(tr("Cancelar")) } })
+}
+
+/** Os diálogos usam a mesma paleta da aba, inclusive no tema escuro. */
+@Composable
+internal fun DialogoComputador(
+    onDismissRequest: () -> Unit,
+    title: @Composable () -> Unit,
+    text: @Composable () -> Unit,
+    confirmButton: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    dismissButton: (@Composable () -> Unit)? = null,
+) {
+    val palette = LocalKeyFlowPalette.current
+    val cores = MaterialTheme.colorScheme.copy(
+        primary = palette.fg,
+        onPrimary = palette.onFill,
+        surface = palette.card,
+        onSurface = palette.fg,
+        onSurfaceVariant = palette.muted,
+        outline = palette.line,
+        error = palette.terracotta,
+    )
+    MaterialTheme(colorScheme = cores) {
+        AlertDialog(
+            onDismissRequest = onDismissRequest,
+            modifier = modifier,
+            title = title,
+            text = text,
+            confirmButton = confirmButton,
+            dismissButton = dismissButton,
+            containerColor = palette.card,
+            titleContentColor = palette.fg,
+            textContentColor = palette.muted,
+            tonalElevation = 0.dp,
+        )
+    }
 }

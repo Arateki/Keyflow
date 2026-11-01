@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -110,7 +109,7 @@ private fun BiometriaDaChave(ligada: Boolean, disponibilidade: Disponibilidade, 
     var aviso by remember { mutableStateOf(false) }
     ToggleRow(tr("Exigir biometria"), if (disponibilidade == Disponibilidade.SIM) tr("Uma autenticação libera a chave por 5 minutos.") else disponibilidade.texto(),
         ligada, { if (it) aviso = true else mudar(false) }, "computador-chave-biometria", enabled = disponibilidade == Disponibilidade.SIM)
-    if (aviso) AlertDialog(onDismissRequest = { aviso = false }, title = { Text(tr("Exigir biometria")) },
+    if (aviso) DialogoComputador(onDismissRequest = { aviso = false }, title = { Text(tr("Exigir biometria")) },
         text = { Text(tr("Se você cadastrar uma nova digital, esta chave deixa de funcionar. Uma autenticação libera a chave por 5 minutos.")) },
         confirmButton = { TextButton({ aviso = false; mudar(true) }, Modifier.testTag("computador-biometria-confirmar")) { Text(tr("Continuar")) } },
         dismissButton = { TextButton({ aviso = false }) { Text(tr("Cancelar")) } })
@@ -132,7 +131,7 @@ private fun CriarChave(importar: Boolean, biometriaInicial: Boolean, acoes: Acoe
     val disponibilidade = acoes.biometriaDisponivel()
     // A nova política também exige o aviso; nunca liga a opção sem a confirmação.
     var avisoInicial by remember { mutableStateOf(biometriaInicial && disponibilidade == Disponibilidade.SIM) }
-    if (avisoInicial) AlertDialog(onDismissRequest = { avisoInicial = false }, title = { Text(tr("Exigir biometria")) },
+    if (avisoInicial) DialogoComputador(onDismissRequest = { avisoInicial = false }, title = { Text(tr("Exigir biometria")) },
         text = { Text(tr("Se você cadastrar uma nova digital, esta chave deixa de funcionar. Uma autenticação libera a chave por 5 minutos.")) },
         confirmButton = { TextButton({ biometria = true; avisoInicial = false }) { Text(tr("Continuar")) } },
         dismissButton = { TextButton({ avisoInicial = false }) { Text(tr("Cancelar")) } })
@@ -179,7 +178,7 @@ private fun CriarChave(importar: Boolean, biometriaInicial: Boolean, acoes: Acoe
             finally { ocupada = false }
         }
     }
-    AlertDialog(onDismissRequest = { if (!ocupada) fechar() }, title = { Text(if (importar) tr("Importar chave") else tr("Gerar chave")) },
+    DialogoComputador(onDismissRequest = { if (!ocupada) fechar() }, title = { Text(if (importar) tr("Importar chave") else tr("Gerar chave")) },
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedTextField(nome, { nome = it.take(80) }, label = { Text(tr("Nome da chave")) }, singleLine = true, modifier = Modifier.testTag("computador-chave-nome"))
             if (importar) {
@@ -221,7 +220,7 @@ private fun DetalhesChave(chave: ChaveSsh, hosts: List<Host>, acoes: AcoesDeChav
     var ocupada by remember { mutableStateOf(false) }
     LaunchedEffect(chave.id) { withContext(Dispatchers.Main.immediate) { try { info = acoes.informacao(chave) } catch (e: Exception) { if (e is CancellationException) throw e; erro = true } } }
     fun executar(acao: suspend () -> Unit) { scope.launch(Dispatchers.Main.immediate) { ocupada = true; try { acao(); aoFechar() } catch (e: Exception) { if (e is CancellationException) throw e; erro = true } finally { ocupada = false } } }
-    AlertDialog(onDismissRequest = { if (!ocupada) aoFechar() }, title = { Text(chave.nome) }, text = {
+    DialogoComputador(onDismissRequest = { if (!ocupada) aoFechar() }, title = { Text(chave.nome) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedTextField(nome, { nome = it.take(80) }, label = { Text(tr("Nome da chave")) }, modifier = Modifier.testTag("computador-chave-renomear"))
             Text(chave.tipo.algoritmoSsh)
@@ -245,11 +244,11 @@ private fun DetalhesChave(chave: ChaveSsh, hosts: List<Host>, acoes: AcoesDeChav
         }
     }, confirmButton = { TextButton({ executar { acoes.renomear(chave, nome.trim()) } }, Modifier.testTag("computador-chave-renomear-salvar"), enabled = nome.isNotBlank() && !ocupada) { Text(tr("Salvar")) } },
         dismissButton = { TextButton(aoFechar, enabled = !ocupada) { Text(tr("Cancelar")) } })
-    if (mudarBiometria) AlertDialog(onDismissRequest = { mudarBiometria = false }, title = { Text(tr("Alterar biometria")) },
+    if (mudarBiometria) DialogoComputador(onDismissRequest = { mudarBiometria = false }, title = { Text(tr("Alterar biometria")) },
         text = { Text(tr("A proteção de uma chave criada não pode ser alterada. Gere outra com a nova política e autorize a nova chave pública nos servidores. Esta chave e seus hosts serão preservados.")) },
         confirmButton = { TextButton({ mudarBiometria = false; aoGerarOutra() }, Modifier.testTag("computador-chave-gerar-outra")) { Text(tr("Gerar outra chave")) } },
         dismissButton = { TextButton({ mudarBiometria = false }) { Text(tr("Cancelar")) } })
-    if (excluir) AlertDialog(onDismissRequest = { if (!ocupada) excluir = false }, title = { Text(tr("Excluir %s?", chave.nome)) },
+    if (excluir) DialogoComputador(onDismissRequest = { if (!ocupada) excluir = false }, title = { Text(tr("Excluir %s?", chave.nome)) },
         text = { Text(tr("Os hosts ficam sem chave e o agente perde o acesso: %s", hosts.joinToString { it.nome }.ifEmpty { tr("Nenhum") })) },
         confirmButton = { TextButton({ executar { acoes.excluir(chave) } }, Modifier.testTag("computador-chave-excluir-confirmar"), enabled = !ocupada) { Text(tr("Excluir")) } },
         dismissButton = { TextButton({ excluir = false }, enabled = !ocupada) { Text(tr("Cancelar")) } })
