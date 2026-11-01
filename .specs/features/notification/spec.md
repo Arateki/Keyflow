@@ -305,10 +305,10 @@ Respondidas por ele em 29/10, 22:20 (viraram decisões): **Q1** (pausar/cancelar
 
 | Requirement | Story | Task | Status |
 | ----------- | ----- | ---- | ------ |
-| NTF-01 | P1-A | NTF-T12, NTF-T13 | Implementing (feita: T12, Estado/Aparência/Interações); aba ainda Em breve, restante em T13 |
+| NTF-01 | P1-A | NTF-T12, NTF-T13 | Verified (T12, T13); aba ativa com Estado, Prévia, Aparência, Interações, Tela bloqueada e Sistema; Computador continua Em breve |
 | NTF-02 | P1-A | NTF-T12 | Verified (T12); permissão, pedido, mostrar e presença no painel |
-| NTF-03 | P1-A | NTF-T13 | Pending |
-| NTF-04 | P1-A | NTF-T13 | Pending |
+| NTF-03 | P1-A | NTF-T13 | Verified (T13); RemoteViews real, sete estados/botões, tempo congelado, skin efetiva e modo do sistema |
+| NTF-04 | P1-A | NTF-T13 | Verified (T13); intent do canal com pacote/id, detalhes do app nas APIs 24–25 e canal criado antes da primeira sessão |
 | NTF-05 | P1-B | NTF-T1, NTF-T9 | Implementing (feitas: T9) |
 | NTF-06 | P1-B | NTF-T1, NTF-T9, NTF-T14 | Implementing (feitas: T9) |
 | NTF-07 | P1-B | NTF-T4, NTF-T9 | Implementing (feitas: T9) |
@@ -319,15 +319,15 @@ Respondidas por ele em 29/10, 22:20 (viraram decisões): **Q1** (pausar/cancelar
 | NTF-12 | P1-B | NTF-T2, NTF-T12 | Verified (T2, T12); cópia ao vivo somente leitura, Alternar/PTT sem inventar ação, congelar ao desligar e confirmação ao religar |
 | NTF-13 | P1-B | NTF-T9 | Verified |
 | NTF-14 | P1-B | NTF-T10 | Verified |
-| NTF-15 | P1-C | NTF-T3, NTF-T13 | Implementing (feitas: T3) |
+| NTF-15 | P1-C | NTF-T3, NTF-T13 | Verified (T3, T13); padrão desligado, atualização atômica e re-post com versão pública real |
 | NTF-16 | P1-C | NTF-T5, NTF-T10, NTF-T14 | Implementing (feitas: T5, T10); prontidão e portão validados no Android pela T11 (14/14), sem a pendência anterior de ANR; provas físicas em T14 |
 | NTF-17 | P1-C | NTF-T9, NTF-T14 | Implementing (feitas: T9) |
 | NTF-18 | P1-D | NTF-T5, NTF-T11, NTF-T14 | Implementing (feitas: T5, T11); serviço/sem escrita verificados; dispensar por gesto real em T14 |
-| NTF-19 | P1-D | NTF-T11, NTF-T13 | Implementing (feito: serviço em T11); painel em T13 |
+| NTF-19 | P1-D | NTF-T11, NTF-T13 | Verified (T11, T13); painel visível/ON_RESUME repõe no mesmo serviço em primeiro plano; sem serviço não envia intent (mutação detectada) |
 | NTF-20 | P1-D | NTF-T9, NTF-T11, NTF-T14 | Implementing (feitas: T9, T11); flag ongoing verificado; prova pré-14/bloqueio/Limpar tudo em T14 |
 | NTF-21 | P1-D | NTF-T9, NTF-T11 | Verified (T9, T11); mínima inicial/fallback/mostrar=false e primeiro plano não nulo |
 | NTF-22 | P1-D | NTF-T11, NTF-T12 | Verified (T11, T12); porta de permissão negada no serviço e explicação/pedido no painel |
-| NTF-23 | P1-D | NTF-T11, NTF-T13 | Implementing (feito: canais em T11, MIN solicitado e promoção LOW do AOSP documentada); ajustes do sistema em T13 |
+| NTF-23 | P1-D | NTF-T11, NTF-T13 | Verified (T11, T13); canais silenciosos e ajustes do canal; MIN solicitado/promovido a LOW pelo AOSP conforme lição da T11, sem redefinir escolha existente |
 | NTF-24 | P1-E | NTF-T7, NTF-T12 | Verified (T7, T12); skins nativas/pagas travadas e pacotes filtrados por notificação, cópia somente leitura |
 | NTF-25 | P1-E | NTF-T6 | Verified |
 | NTF-26 | P1-E | NTF-T7 | Verified |
@@ -344,7 +344,7 @@ Respondidas por ele em 29/10, 22:20 (viraram decisões): **Q1** (pausar/cancelar
 | NTF-37 | P1-G | NTF-T3 | Verified |
 | NTF-38 | P1-G | NTF-T3, NTF-T10 | Implementing (feitas: T10) |
 | NTF-39 | P1-H | NTF-T2, NTF-T3, NTF-T20 | Implementing (feitas: T3) |
-| NTF-40 | P2-I | NTF-T12, NTF-T13 (cada uma traz os seus textos) | Implementing (feita: T12, textos e descrições PT/en/es, TranslationsTest 5/5); textos de T13 pendentes |
+| NTF-40 | P2-I | NTF-T12, NTF-T13 (cada uma traz os seus textos) | Verified (T12, T13); textos/descrições em tr, PT/en/es sem duplicação e TranslationsTest 5/5 |
 | NTF-41 | P2-I | NTF-T2, NTF-T4, NTF-T5 | Implementing (feitas: T5) |
 | NTF-42 | P2-I | NTF-T11 | Verified (T11 e P3 da T12); geração/coalescência, Binder fora da trava da main e fallback de Throwable com cancelamento preservado (15/15); mutação detectada |
 | NTF-43 | P2-I | NTF-T1, NTF-T14, NTF-T18 | Implementing (T1: emulador medido, cabe; aparelhos pendentes) |
@@ -356,7 +356,9 @@ Respondidas por ele em 29/10, 22:20 (viraram decisões): **Q1** (pausar/cancelar
 | NTF-49 | P1-I | NTF-T5, NTF-T10, NTF-T14 | Implementing (feitas: T10) |
 | NTF-50 | P1-I | NTF-T1, NTF-T9, NTF-T14 | Implementing (feitas: T9) |
 
-Validação da T12 e P3: [lição de 01/11](../../project/licoes/2026-11-01-notificacao-d.md) (painel 14/14, compartilhados 18/18, serviço 14/14, JVM 3.183/3.183 e lint sem problemas). A promoção da aba e a prévia continuam na T13.
+Validação da T12 e P3: [lição de 01/11](../../project/licoes/2026-11-01-notificacao-d.md) (painel 14/14, compartilhados 18/18, serviço 14/14, JVM 3.183/3.183 e lint sem problemas). A T12 preservou a aba Em breve até a T13.
+
+Validação da T13: [lição de 01/11](../../project/licoes/2026-11-01-notificacao-e.md), 64/64 Android, 3.183/3.183 JVM, lint sem problemas e mutação de início indevido do serviço detectada/revertida. Goldens ficam para T15 e ajuda/Docs para T16.
 
 **Coverage:** 50 requisitos, 50 mapeados em tasks, 0 sem task.
 **Status values:** Pending → In Design → In Tasks → Implementing → Verified.
