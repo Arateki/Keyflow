@@ -74,10 +74,30 @@ fun ComputadorPanel(
             SecaoComputador.HOSTS -> ComputadorHosts(hosts.hosts, chaves, sessoes, acoes)
             SecaoComputador.CHAVES -> {
                 val contexto = androidx.compose.ui.platform.LocalContext.current
-                val acoesEfetivas = acoesChaves ?: remember(contexto) { com.keyflow.computador.app.ComputadorApp.de(contexto).acoesDeChaves }
-                ComputadorChaves(chaves, hosts.hosts, acoesEfetivas)
+                val app = if (acoesChaves == null) remember(contexto) { com.keyflow.computador.app.ComputadorApp.de(contexto) } else null
+                if (app != null) AtividadeDasChaves(app)
+                ComputadorChaves(chaves, hosts.hosts, acoesChaves ?: app!!.acoesDeChaves)
             }
             SecaoComputador.SESSOES -> InfoNote(tr("A lista de sessões chega na próxima etapa."), COMPUTADOR_EM_BREVE_TAG)
         }
+    }
+}
+
+/** Liga o prompt à activity visível; sair da seção também solta a referência. */
+@Composable
+private fun AtividadeDasChaves(app: com.keyflow.computador.app.ComputadorApp) {
+    var contexto: android.content.Context = androidx.compose.ui.platform.LocalContext.current
+    while (contexto is android.content.ContextWrapper && contexto !is androidx.fragment.app.FragmentActivity) contexto = contexto.baseContext
+    val atividade = contexto as? androidx.fragment.app.FragmentActivity ?: return
+    val dono = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(app, atividade, dono) {
+        fun atualizar() {
+            if (dono.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) app.atividadeVisivel(atividade)
+            else app.atividadeOculta(atividade)
+        }
+        val observador = androidx.lifecycle.LifecycleEventObserver { _, _ -> atualizar() }
+        dono.lifecycle.addObserver(observador)
+        atualizar()
+        onDispose { dono.lifecycle.removeObserver(observador); app.atividadeOculta(atividade) }
     }
 }

@@ -1,6 +1,11 @@
 package com.keyflow.ui.config
 
 import android.content.ClipboardManager
+import android.view.View
+import android.view.inputmethod.EditorInfo
+import android.widget.EditText
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.runtime.SideEffect
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -17,6 +22,10 @@ import com.keyflow.computador.AutenticacaoHost
 import com.keyflow.computador.Host
 import com.keyflow.computador.ImpressaoDigital
 import com.keyflow.computador.app.Disponibilidade
+import com.keyflow.computador.app.AutenticadorDeUsuario
+import com.keyflow.computador.app.ProvedorDeChavesAndroid
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import com.keyflow.computador.chaves.*
 import com.keyflow.ui.theme.KeyFlowTheme
 import org.junit.Assert.*
@@ -62,7 +71,11 @@ class ComputadorChavesTest {
         regra.setContent { KeyFlowTheme(dark = dark) { Column(Modifier.verticalScroll(rememberScrollState())) { ComputadorChaves(a.chaves, hosts, a) } } }
     }
     private fun no(tag: String) = regra.onNodeWithTag(tag, useUnmergedTree = true)
-    private fun clicar(tag: String) = no(tag).performScrollTo().performClick()
+    private fun clicar(tag: String) {
+        val alvo = no(tag)
+        if (!alvo.isDisplayed()) alvo.performScrollTo()
+        alvo.performClick()
+    }
     private fun digitar(tag: String, valor: String) = no(tag).performScrollTo().performTextReplacement(valor)
     private fun texto(valor: String) = regra.onNodeWithText(valor, useUnmergedTree = true)
     private fun varrerSegredos(vararg segredos: String) {
@@ -73,6 +86,57 @@ class ComputadorChavesTest {
         for (n in nos) for ((_, valor) in n.config) {
             assertTrue("segredo na propriedade semântica", segredos.none { it in valor.toString() })
         }
+    }
+    @Test fun tecladoNativoDigitaSemRevelarUltimoCaractereNemPermitirCopia() {
+        val segredo = SegredoDigitado()
+        var raiz: View? = null
+        regra.setContent { KeyFlowTheme(dark = false) {
+            val view = LocalView.current
+            SideEffect { raiz = view.rootView }
+            CampoSecretoComputador("Senha de teste", segredo, "nativa")
+        } }
+        regra.runOnIdle {
+            val campo = raiz!!.findViewWithTag<EditText>("entrada-secreta-nativa")
+            campo.requestFocus()
+            val entrada = campo.onCreateInputConnection(EditorInfo())!!
+            assertTrue(entrada.commitText("SENTINELA-NATIVA-FALSA", 1))
+            val copia = segredo.copiar()
+            try { assertEquals("SENTINELA-NATIVA-FALSA", copia.concatToString()) } finally { copia.fill('\u0000') }
+            assertEquals("•".repeat(campo.length()), campo.transformationMethod.getTransformation(campo.text, campo).toString())
+            assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS, campo.importantForAccessibility)
+            assertFalse(campo.isSaveEnabled)
+            val clipboard = campo.context.getSystemService(ClipboardManager::class.java)
+            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("", "PUBLICA-FALSA"))
+            campo.selectAll()
+            campo.onTextContextMenuItem(android.R.id.copy)
+            assertEquals("PUBLICA-FALSA", clipboard.primaryClip!!.getItemAt(0).text.toString())
+        }
+        varrerSegredos("SENTINELA-NATIVA-FALSA")
+    }
+    @Test fun protecaoDoKeystoreRealApareceNaTelaSemSerInferidaPelaApi() {
+        val cofre = object : CofreDeSegredos {
+            private val valores = mutableMapOf<String, String>()
+            override fun ler(chave: String) = valores[chave]
+            override fun gravar(chave: String, valor: String) { valores[chave] = valor }
+            override fun apagar(chave: String) { valores.remove(chave) }
+            override fun valores(): Collection<String> = valores.values
+        }
+        val aut = object : AutenticadorDeUsuario {
+            override fun disponivel() = Disponibilidade.NADA_CADASTRADO
+            override suspend fun autenticar(titulo: String, descricao: String) = false
+        }
+        val provedor = ProvedorDeChavesAndroid(cofre, aut)
+        val c = (runBlocking(Dispatchers.IO) { provedor.gerar("proteção real", TipoDeChave.ECDSA_P256, false) } as Resultado.Ok).valor
+        try {
+            mostrar(Acoes(listOf(c)))
+            val esperada = when (c.protecao) {
+                Protecao.HARDWARE -> "Protegida pelo hardware do aparelho"
+                Protecao.SOFTWARE_COFRE -> "Protegida pelo Keystore (por software)"
+                Protecao.KEYSTORE_ENVELOPE -> "Guardada cifrada no cofre do aparelho"
+            }
+            texto(esperada).assertIsDisplayed()
+            assertTrue(provedor.linhaDaPublica(c, "teste")!!.startsWith("ecdsa-sha2-nistp256 "))
+        } finally { provedor.excluir(c) }
     }
     @Test fun gerarExigeEscolherOTipoAntesDeSalvar() {
         val a = Acoes(); mostrar(a)

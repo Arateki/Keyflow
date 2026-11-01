@@ -8,6 +8,7 @@ import android.text.method.TransformationMethod
 import android.graphics.Rect
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +17,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -23,6 +26,9 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.password
+import androidx.compose.ui.semantics.focused
+import androidx.compose.ui.semantics.requestFocus
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setText
 import androidx.compose.ui.unit.dp
@@ -53,10 +59,12 @@ internal class SegredoDigitado {
 @Composable
 internal fun CampoSecretoComputador(label: String, segredo: SegredoDigitado, tag: String, variasLinhas: Boolean = false) {
     val palette = LocalKeyFlowPalette.current
-    var campo: EditText? = null
+    val identificador = tag
+    val campo = remember(segredo) { arrayOfNulls<EditText>(1) }
     val revisao = segredo.revisao
+    var temFoco by remember { mutableStateOf(false) }
     DisposableEffect(segredo) {
-        onDispose { segredo.limpar(); campo?.text?.clear() }
+        onDispose { segredo.limpar(); campo[0]?.text?.clear(); campo[0] = null }
     }
     Column {
         Text(label, color = palette.muted)
@@ -65,6 +73,15 @@ internal fun CampoSecretoComputador(label: String, segredo: SegredoDigitado, tag
                 .testTag(tag).semantics {
                     contentDescription = label
                     password()
+                    focused = temFoco
+                    requestFocus { campo[0]?.requestFocus() ?: false }
+                    onClick {
+                        campo[0]?.let { view ->
+                            view.requestFocus()
+                            view.context.getSystemService(InputMethodManager::class.java).showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
+                        }
+                        true
+                    }
                     setText { valor ->
                         val copia = valor.text.toCharArray()
                         try { segredo.substituir(copia) } finally { copia.fill('\u0000') }
@@ -72,8 +89,13 @@ internal fun CampoSecretoComputador(label: String, segredo: SegredoDigitado, tag
                     }
                 },
             factory = { contexto ->
-                EditText(contexto).apply {
-                    campo = this
+                object : EditText(contexto) {
+                    override fun onTextContextMenuItem(id: Int): Boolean =
+                        if (id == android.R.id.copy || id == android.R.id.cut) true else super.onTextContextMenuItem(id)
+                }.apply {
+                    campo[0] = this
+                    this.tag = "entrada-secreta-$identificador"
+                    onFocusChangeListener = View.OnFocusChangeListener { _, focada -> temFoco = focada }
                     importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
                     if (Build.VERSION.SDK_INT >= 26) importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
                     isSaveEnabled = false
@@ -102,7 +124,7 @@ internal fun CampoSecretoComputador(label: String, segredo: SegredoDigitado, tag
                 }
             },
             update = { view ->
-                campo = view
+                campo[0] = view
                 view.setTextColor(palette.fg.toArgb())
                 // Ler a revisão observa apenas a mudança, nunca publica os caracteres em semantics.
                 @Suppress("UNUSED_VARIABLE") val atualizacao = revisao

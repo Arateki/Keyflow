@@ -139,8 +139,9 @@ private fun CriarChave(importar: Boolean, biometriaInicial: Boolean, acoes: Acoe
     val arquivo = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch(Dispatchers.Main.immediate) {
             ocupada = true
+            var conteudo: CharArray? = null
             try {
-                val conteudo = withContext(Dispatchers.IO) {
+                withContext(Dispatchers.IO) {
                     contexto.contentResolver.openInputStream(uri)?.reader(Charsets.UTF_8)?.use { leitor ->
                         val buffer = CharArray(1024 * 1024 + 1)
                         try {
@@ -151,13 +152,13 @@ private fun CriarChave(importar: Boolean, biometriaInicial: Boolean, acoes: Acoe
                                 total += n
                             }
                             require(total <= 1024 * 1024)
-                            buffer.copyOf(total)
+                            conteudo = buffer.copyOf(total)
                         } finally { buffer.fill('\u0000') }
                     } ?: error("arquivo indisponível")
                 }
-                try { privada.substituir(conteudo); erro = null } finally { conteudo.fill('\u0000') }
+                conteudo?.let { privada.substituir(it) }; erro = null
             } catch (e: Exception) { if (e is CancellationException) throw e; erro = tr("Não consegui ler esta chave. Escolha um arquivo de até 1 MB.") }
-            finally { ocupada = false }
+            finally { conteudo?.fill('\u0000'); ocupada = false }
         }
     }
     fun salvar() {

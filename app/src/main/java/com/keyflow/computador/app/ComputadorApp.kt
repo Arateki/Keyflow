@@ -77,6 +77,12 @@ class ComputadorApp private constructor(private val contexto: Context, dependenc
     /** O `FragmentActivity` visível (o `BiometricPrompt` precisa dele); `null` em segundo plano. */
     fun atividadeVisivel(a: FragmentActivity?) { atividade.set(WeakReference(a)) }
 
+    /** Uma activity antiga não apaga a referência da que acabou de chegar à frente. */
+    fun atividadeOculta(a: FragmentActivity) {
+        val referencia = atividade.get()
+        if (referencia.get() === a) atividade.compareAndSet(referencia, WeakReference(null))
+    }
+
     /**
      * Abre uma sessão para [host]: cria o emulador **antes** (para o primeiro byte do servidor já ter onde cair) e o liga à sessão. As
      * cores iniciais são as do tema; a tela troca por `setDefaultColors` quando o tema muda.

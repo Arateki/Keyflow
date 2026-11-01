@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
+import com.keyflow.computador.AutenticacaoHost
 import com.keyflow.computador.Host
 import com.keyflow.computador.sessao.DonoDaSessao
 import com.keyflow.computador.sessao.ResultadoAbertura
@@ -52,6 +53,7 @@ class TerminalActivity : FragmentActivity() {
             val resumos by app.gerenciador.resumos.collectAsStateOnMain()
             val hostsCfg by remember { app.repositorio.hostsFlow() }.collectAsStateOnMain(initial = null)
             val hosts = hostsCfg?.hosts.orEmpty()
+            val chavesCfg by remember { app.repositorio.chavesFlow() }.collectAsStateOnMain(initial = emptyList())
             var ativaId by remember { mutableStateOf(intent.getStringExtra(EXTRA_SESSAO_ID)) }
             var aviso by remember { mutableStateOf<String?>(null) }
             val escopo = rememberCoroutineScope()
@@ -62,6 +64,25 @@ class TerminalActivity : FragmentActivity() {
                         is ResultadoAbertura.Aberta -> { ativaId = r.sessao.id; aviso = null }
                         is ResultadoAbertura.Recusada -> aviso = r.motivo.texto()
                     }
+                }
+                com.keyflow.ui.config.ComputadorDialogos(app.interacao)
+                var erroVisto by remember { mutableStateOf<Pair<String, com.keyflow.computador.ssh.CausaSsh>?>(null) }
+                val atual = resumos.firstOrNull { it.id == ativaId }
+                val causa = (atual?.estado as? com.keyflow.computador.sessao.EstadoSessao.Falhou)?.causa
+                if (atual != null && causa != null && erroVisto != (atual.id to causa)) {
+                    val chaveId = (hosts.firstOrNull { it.id == atual.hostId }?.autenticacao as? AutenticacaoHost.Chave)?.keyId
+                    val chave = chavesCfg.firstOrNull { it.id == chaveId }
+                    com.keyflow.ui.config.ErroComputador(causa,
+                        copiarPublica = chave?.let { c -> { escopo.launch(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                            try {
+                                val publica = app.acoesDeChaves.informacao(c).publica
+                                if (publica != null) copiar(publica) else aviso = tr("O aparelho não conseguiu criar ou usar a chave.")
+                            } catch (e: Exception) {
+                                if (e is kotlinx.coroutines.CancellationException) throw e
+                                aviso = tr("O aparelho não conseguiu criar ou usar a chave.")
+                            }
+                        } } },
+                    ) { erroVisto = atual.id to causa }
                 }
                 // Pedido de abrir um host ao chegar (uma vez só, mesmo depois de girar a tela).
                 androidx.compose.runtime.LaunchedEffect(hostsCfg, hostIdPedido) {
@@ -91,7 +112,7 @@ class TerminalActivity : FragmentActivity() {
     }
 
     override fun onStop() {
-        app.atividadeVisivel(null)
+        app.atividadeOculta(this)
         super.onStop()
     }
 

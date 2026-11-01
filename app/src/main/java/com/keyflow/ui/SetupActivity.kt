@@ -13,7 +13,7 @@ import android.os.Bundle
 import android.os.SystemClock
 import android.provider.Settings as AndroidSettings
 import android.widget.Toast
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -100,7 +100,7 @@ import com.keyflow.ads.toInterstitialPolicyParams
  * [SettingsRepository.saveSettings]. O toggle de Modo Overlay também liga/desliga o [OverlayService]
  * (a fiação do FGS foi reaproveitada do antigo "Ativar botão flutuante").
  */
-class SetupActivity : ComponentActivity() {
+class SetupActivity : FragmentActivity() {
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val permissionsChecker = PermissionsChecker()
     private lateinit var settingsRepository: SettingsRepository
