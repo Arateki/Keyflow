@@ -72,6 +72,20 @@ class ComputadorDialogosTest {
         no("computador-servidor-substituir").performClick()
         assertTrue(runBlocking { p.resposta.await() })
     }
+    @Test fun toqueDuploNoRevisarNaoSubstitui() {
+        val p = PedidoDeInteracao.ServidorMudou("ssh.example.org", 22, "ssh-ed25519", antiga, nova)
+        regra.setContent { KeyFlowTheme(dark = false) { ServidorMudou(p) } }
+        regra.mainClock.autoAdvance = false
+        no("computador-servidor-revisar").performClick()
+        regra.mainClock.advanceTimeByFrame()
+        no("computador-servidor-substituir").assertIsNotEnabled().performClick()
+        regra.mainClock.advanceTimeByFrame()
+        assertFalse(p.resposta.isCompleted)
+        regra.mainClock.advanceTimeBy(PAUSA_ANTES_DE_SUBSTITUIR_MS + 100)
+        no("computador-servidor-substituir").assertIsEnabled().performClick()
+        regra.mainClock.autoAdvance = true
+        assertTrue(runBlocking { p.resposta.await() })
+    }
     @Test fun cancelarNoSegundoPassoNaoSubstitui() {
         val p = PedidoDeInteracao.ServidorMudou("ssh.example.org", 22, "ssh-ed25519", antiga, nova)
         regra.setContent { KeyFlowTheme(dark = false) { ServidorMudou(p) } }

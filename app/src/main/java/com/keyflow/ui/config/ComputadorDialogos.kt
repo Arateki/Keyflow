@@ -66,9 +66,14 @@ internal fun ConfirmarServidor(pedido: PedidoDeInteracao.ConfirmarServidor) {
 }
 
 /** As duas telas exigem uma decisão nova; Enter, Voltar e toque fora nunca substituem a confiança. */
+internal const val PAUSA_ANTES_DE_SUBSTITUIR_MS = 600L
+
 @Composable
 internal fun ServidorMudou(pedido: PedidoDeInteracao.ServidorMudou) {
     var segundoPasso by remember { mutableStateOf(false) }
+    // O segundo passo só aceita toque depois de uma pausa: um toque duplo no mesmo lugar não pode substituir (CMP-18).
+    var podeSubstituir by remember { mutableStateOf(false) }
+    LaunchedEffect(segundoPasso) { if (segundoPasso) { kotlinx.coroutines.delay(PAUSA_ANTES_DE_SUBSTITUIR_MS); podeSubstituir = true } }
     val focoCancelar = remember(segundoPasso) { FocusRequester() }
     DialogoComputador(onDismissRequest = { pedido.resposta.complete(false) }, modifier = Modifier.testTag("computador-servidor-mudou"),
         title = { Text(tr("A identificação deste servidor mudou.")) },
@@ -91,8 +96,9 @@ internal fun ServidorMudou(pedido: PedidoDeInteracao.ServidorMudou) {
                 .semantics { stateDescription = tr("Ação padrão: Cancelar") }) { Text(tr("Cancelar")) }
         },
         dismissButton = {
-            TextButton({ if (segundoPasso) pedido.resposta.complete(true) else segundoPasso = true },
-                Modifier.testTag(if (segundoPasso) "computador-servidor-substituir" else "computador-servidor-revisar")) {
+            TextButton({ if (!segundoPasso) segundoPasso = true else if (podeSubstituir) pedido.resposta.complete(true) },
+                enabled = !segundoPasso || podeSubstituir,
+                modifier = Modifier.testTag(if (segundoPasso) "computador-servidor-substituir" else "computador-servidor-revisar")) {
                 Text(if (segundoPasso) tr("Substituir e continuar") else tr("Revisar substituição"))
             }
         })

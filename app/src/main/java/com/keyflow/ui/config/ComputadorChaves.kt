@@ -125,6 +125,7 @@ private fun CriarChave(importar: Boolean, biometriaInicial: Boolean, acoes: Acoe
     var erro by remember { mutableStateOf<String?>(null) }
     var ocupada by remember { mutableStateOf(false) }
     var pedirPassphrase by remember { mutableStateOf(false) }
+    var hashDoColado by remember { mutableStateOf<Int?>(null) }
     val privada = remember { SegredoDigitado() }
     val passphrase = remember { SegredoDigitado() }
     DisposableEffect(Unit) { onDispose { privada.limpar(); passphrase.limpar() } }
@@ -171,7 +172,7 @@ private fun CriarChave(importar: Boolean, biometriaInicial: Boolean, acoes: Acoe
                     finally { p.fill('\u0000'); s?.fill('\u0000'); passphrase.limpar() }
                 } else acoes.gerar(nome.trim(), tipo!!, biometria)
                 when (r) {
-                    is Resultado.Ok -> { privada.limpar(); passphrase.limpar(); fechar() }
+                    is Resultado.Ok -> { privada.limpar(); passphrase.limpar(); hashDoColado?.let { descartarClipColado(contexto, it) }; fechar() }
                     is Resultado.Falha -> { erro = r.erro.texto(); if (r.erro == ErroChave.PASSPHRASE_NECESSARIA || r.erro == ErroChave.PASSPHRASE) pedirPassphrase = true }
                 }
             } catch (e: Exception) { if (e is CancellationException) throw e; erro = ErroChave.FALHA_DO_APARELHO.texto() }
@@ -188,6 +189,7 @@ private fun CriarChave(importar: Boolean, biometriaInicial: Boolean, acoes: Acoe
                 SecondaryButton(tr("Colar chave privada"), "computador-chave-colar", {
                     val texto = contexto.getSystemService(ClipboardManager::class.java).primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text
                     if (texto != null && texto.length <= 1024 * 1024) {
+                        hashDoColado = texto.toString().hashCode()
                         val copia = CharArray(texto.length) { texto[it] }
                         try { privada.substituir(copia) } finally { copia.fill('\u0000') }
                     }
@@ -252,4 +254,12 @@ private fun DetalhesChave(chave: ChaveSsh, hosts: List<Host>, acoes: AcoesDeChav
         text = { Text(tr("Os hosts ficam sem chave e o agente perde o acesso: %s", hosts.joinToString { it.nome }.ifEmpty { tr("Nenhum") })) },
         confirmButton = { TextButton({ executar { acoes.excluir(chave) } }, Modifier.testTag("computador-chave-excluir-confirmar"), enabled = !ocupada) { Text(tr("Excluir")) } },
         dismissButton = { TextButton({ excluir = false }, enabled = !ocupada) { Text(tr("Cancelar")) } })
+}
+
+/** CMP-12: a privada colada não fica na área de transferência depois da importação (só apaga se o clipe ainda for o mesmo). */
+internal fun descartarClipColado(contexto: android.content.Context, hash: Int) {
+    val clip = contexto.getSystemService(ClipboardManager::class.java) ?: return
+    val atual = clip.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text ?: return
+    if (atual.toString().hashCode() != hash) return
+    if (android.os.Build.VERSION.SDK_INT >= 28) clip.clearPrimaryClip() else clip.setPrimaryClip(android.content.ClipData.newPlainText("", ""))
 }
