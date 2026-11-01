@@ -28,6 +28,11 @@ class ComputadorDialogosTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     @After fun limpar() { scope.cancel() }
     private fun no(tag: String) = regra.onNodeWithTag(tag, useUnmergedTree = true)
+    /** O Substituir fica em pausa logo depois de aparecer (toque duplo não substitui); o clique só vale depois dela. */
+    private fun esperarSubstituirAtivo() = regra.waitUntil(5_000) {
+        regra.onAllNodesWithTag("computador-servidor-substituir", useUnmergedTree = true).fetchSemanticsNodes()
+            .any { SemanticsProperties.Disabled !in it.config }
+    }
     private fun varrerSegredo(segredo: String) {
         fun todos(n: androidx.compose.ui.semantics.SemanticsNode): List<androidx.compose.ui.semantics.SemanticsNode> = listOf(n) + n.children.flatMap(::todos)
         val nos = regra.onAllNodes(isRoot(), useUnmergedTree = true).fetchSemanticsNodes().flatMap(::todos)
@@ -49,7 +54,7 @@ class ComputadorDialogosTest {
         val p = PedidoDeInteracao.ConfirmarServidor("ssh.example.org", 22, "ssh-ed25519", nova)
         regra.setContent { KeyFlowTheme(dark = false) { ConfirmarServidor(p) } }
         no("computador-servidor-cancelar").performClick()
-        assertFalse(runBlocking { p.resposta.await() })
+        assertFalse(runBlocking { withTimeout(5_000) { p.resposta.await() } })
     }
     @Test fun servidorMudouCancelarEPadraoEExibeAsDuasImpressoes() {
         val p = PedidoDeInteracao.ServidorMudou("ssh.example.org", 22, "ssh-ed25519", antiga, nova)
@@ -61,7 +66,7 @@ class ComputadorDialogosTest {
         no("computador-servidor-substituir").assertDoesNotExist()
         no("computador-servidor-cancelar").performKeyInput { pressKey(Key.Enter) }
         assertTrue(p.resposta.isCompleted)
-        assertFalse(runBlocking { p.resposta.await() })
+        assertFalse(runBlocking { withTimeout(5_000) { p.resposta.await() } })
     }
     @Test fun substituirExigeSegundoPassoEOutraAcaoExplicita() {
         val p = PedidoDeInteracao.ServidorMudou("ssh.example.org", 22, "ssh-ed25519", antiga, nova)
@@ -69,8 +74,10 @@ class ComputadorDialogosTest {
         no("computador-servidor-revisar").performClick()
         assertFalse(p.resposta.isCompleted)
         no("computador-servidor-cancelar").assertIsFocused()
+        esperarSubstituirAtivo()
         no("computador-servidor-substituir").performClick()
-        assertTrue(runBlocking { p.resposta.await() })
+        regra.waitUntil(5_000) { p.resposta.isCompleted }
+        assertTrue(runBlocking { withTimeout(5_000) { p.resposta.await() } })
     }
     @Test fun toqueDuploNoRevisarNaoSubstitui() {
         val p = PedidoDeInteracao.ServidorMudou("ssh.example.org", 22, "ssh-ed25519", antiga, nova)
@@ -79,17 +86,16 @@ class ComputadorDialogosTest {
         no("computador-servidor-revisar").performTouchInput { click(center); advanceEventTime(100); click(center) }
         regra.waitForIdle()
         assertFalse(p.resposta.isCompleted)
-        regra.waitUntil(5_000) { regra.onAllNodesWithTag("computador-servidor-substituir", useUnmergedTree = true).fetchSemanticsNodes()
-            .any { SemanticsProperties.Disabled !in it.config } }
+        esperarSubstituirAtivo()
         no("computador-servidor-substituir").performClick()
         regra.waitUntil(5_000) { p.resposta.isCompleted }
-        assertTrue(runBlocking { p.resposta.await() })
+        assertTrue(runBlocking { withTimeout(5_000) { p.resposta.await() } })
     }
     @Test fun cancelarNoSegundoPassoNaoSubstitui() {
         val p = PedidoDeInteracao.ServidorMudou("ssh.example.org", 22, "ssh-ed25519", antiga, nova)
         regra.setContent { KeyFlowTheme(dark = false) { ServidorMudou(p) } }
         no("computador-servidor-revisar").performClick(); no("computador-servidor-cancelar").performClick()
-        assertFalse(runBlocking { p.resposta.await() })
+        assertFalse(runBlocking { withTimeout(5_000) { p.resposta.await() } })
     }
     @Test fun senhaMascaradaNaoPublicaTextoNemInputText() {
         val p = PedidoDeInteracao.Senha()
@@ -100,14 +106,14 @@ class ComputadorDialogosTest {
         no("computador-senha").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.InputText))
         regra.onNodeWithText("SENHA-FALSA-SENTINELA", useUnmergedTree = true).assertDoesNotExist()
         no("computador-senha-continuar").performClick()
-        assertEquals("SENHA-FALSA-SENTINELA-digitada", runBlocking { p.resposta.await() })
+        assertEquals("SENHA-FALSA-SENTINELA-digitada", runBlocking { withTimeout(5_000) { p.resposta.await() } })
     }
     @Test fun cancelarSenhaRecusaSemEntregarOTexto() {
         val p = PedidoDeInteracao.Senha()
         regra.setContent { KeyFlowTheme(dark = false) { PedirSenha(p) } }
         no("computador-senha").performTextReplacement("SENHA-FALSA")
         no("computador-senha-cancelar").performClick()
-        assertNull(runBlocking { p.resposta.await() })
+        assertNull(runBlocking { withTimeout(5_000) { p.resposta.await() } })
     }
     @Test fun keyboardInteractiveMantemOrdemECamposProtegidosInclusiveComEco() {
         val p = PedidoDeInteracao.Codigo("Verificação", "Use os dados de teste", listOf("Código", "Senha"), listOf(true, false))
@@ -116,7 +122,7 @@ class ComputadorDialogosTest {
         no("computador-codigo-1").performScrollTo().performTextReplacement("senha-ki-falsa")
         varrerSegredo("123456-FALSO"); varrerSegredo("senha-ki-falsa")
         no("computador-codigo-continuar").performClick()
-        assertEquals(listOf("123456-FALSO", "senha-ki-falsa"), runBlocking { p.resposta.await() })
+        assertEquals(listOf("123456-FALSO", "senha-ki-falsa"), runBlocking { withTimeout(5_000) { p.resposta.await() } })
     }
     @Test fun sairDaTelaRecusaPedidoPendente() {
         val interacao = InteracaoDoApp()
