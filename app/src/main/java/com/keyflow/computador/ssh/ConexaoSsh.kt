@@ -25,6 +25,8 @@ class DestinoSsh(
 /** Quem responde ao que só o usuário pode responder. Cada chamada **suspende** até a resposta; cancelar a coroutine vale como recusa. */
 interface InteracaoComUsuario {
     suspend fun confirmarServidor(host: String, porta: Int, algoritmo: String, impressao: ImpressaoDigital): Boolean
+    /** A tela exige dois passos; implementações sem tela recusam por padrão. */
+    suspend fun confirmarTrocaServidor(host: String, porta: Int, algoritmo: String, antiga: ImpressaoDigital, nova: ImpressaoDigital): Boolean = false
     suspend fun pedirSenha(): String?
     suspend fun pedirCodigo(nome: String, instrucao: String, perguntas: List<String>, eco: List<Boolean>): List<String>?
 }

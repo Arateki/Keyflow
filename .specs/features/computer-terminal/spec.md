@@ -391,18 +391,18 @@ Nenhuma. Q1–Q13 foram respondidas em 29/10 (D12–D24). Q8, Q9, Q10, Q11 e Q13
 | CMP-07 | P1-A | CMP-T11, CMP-T15 | Verificada (T11 e T15: exclusão com confirmação, aviso de nova impressão ao mudar endereço/porta) |
 | CMP-08 | P1-A | CMP-T9, CMP-T15 | Verificada (T9 + `TestadorDeConexao` contra o `SshFixtureServer`; modal mostra impressão, método e latência; sem `delay`) |
 | CMP-09 | P1-A | CMP-T5, CMP-T15 | Revisão #96: disponibilidade real de credencial, chave vazia recusada e segredo confirmado antes da permissão (`RegraAgenteTest`, `ValidadorHostTest`, `GravadorDeHostsTest`); aviso/confirmar mantidos. Novos instrumentados compilados e pendentes por ANR do SystemUI |
-| CMP-10 | P1-B | CMP-T7, CMP-T8, CMP-T16 | Parcial — geração no Keystore/envelope (CMP-T8) implementada; falta T16 |
-| CMP-11 | P1-B | CMP-T2, CMP-T8, CMP-T16 | Parcial — sonda e envelope (CMP-T8); falta T2 e T16 |
-| CMP-12 | P1-B | CMP-T7, CMP-T16 | Parcial — importação (CMP-T7) verificada; falta T16 |
-| CMP-13 | P1-B | CMP-T7, CMP-T8, CMP-T16 | Parcial — pública (CMP-T7/T8); falta T16 |
-| CMP-14 | P1-B | CMP-T2, CMP-T8, CMP-T10, CMP-T16 | Parcial — janela de 300 s (CMP-T8); falta T2, T10, T16 |
-| CMP-15 | P1-B | CMP-T11, CMP-T16 | Pending |
+| CMP-10 | P1-B | CMP-T7, CMP-T8, CMP-T16 | Verificada (T7/T8/T16) — escolha explícita ED25519 ou ECDSA P-256, proteção medida; três proteções injetáveis e P-256 real no emulador |
+| CMP-11 | P1-B | CMP-T2, CMP-T8, CMP-T16 | Parcial — sonda/envelope e resultado na tela verificados (T8/T16); tabela por aparelho da T2 pendente ([lição](../../project/licoes/2026-11-01-computador-e.md)) |
+| CMP-12 | P1-B | CMP-T7, CMP-T16 | Verificada (T7/T16) — OpenDocument ou colagem, passphrase transitória e campo limpo no erro; privada ausente do semantics |
+| CMP-13 | P1-B | CMP-T7, CMP-T8, CMP-T16 | Verificada (T7/T8/T16) — só a pública é exibida/copiada, nos formatos ED25519 e ECDSA; varredura de segredos e mutação detectada |
+| CMP-14 | P1-B | CMP-T2, CMP-T8, CMP-T10, CMP-T16 | Parcial — UI, aviso, indisponibilidade e janela de 300 s (T8/T10/T16); alteração por nova chave decidida pelo coordenador, revisável pelo Yan; faltam T2 e validação física T21 ([lição](../../project/licoes/2026-11-01-computador-e.md)) |
+| CMP-15 | P1-B | CMP-T11, CMP-T16 | Verificada (T11/T16) — lista, hosts associados, renomeação e exclusão confirmada; hosts ficam sem chave e perdem acesso do agente |
 | CMP-16 | P1-B | CMP-T7, CMP-T8 | Parcial — sentinelas e `SecretFilter` (CMP-T7/T8) verificados |
 | CMP-17 | P1-C | CMP-T9 | Parcial — adaptador cbssh (CMP-T9) verificado contra o servidor de teste; falta a tela |
-| CMP-18 | P1-C | CMP-T6, CMP-T16 | Parcial — política TOFU (T6) e verificação suspensa na conexão (T9); falta a tela (T16) |
+| CMP-18 | P1-C | CMP-T6, CMP-T16 | Verificada (T6/T9/T16) — confiança suspende login; troca em dois passos, Cancelar destacado/com foco, agente nunca confirma nem substitui |
 | CMP-19 | P1-C | CMP-T6, CMP-T11 | Parcial — `known_hosts` em arquivo atômico e rotação (T6, T11); exclusão em cascata verificada |
-| CMP-20 | P1-C | CMP-T9, CMP-T16 | Pending |
-| CMP-21 | P1-C | CMP-T9, CMP-T16 | Pending |
+| CMP-20 | P1-C | CMP-T9, CMP-T16 | Verificada (T9/T16) — senha e keyboard-interactive com campos protegidos, respostas ordenadas, cancelamento e fila de pedidos testados |
+| CMP-21 | P1-C | CMP-T9, CMP-T16 | Verificada (T9/T16) — mensagem e orientação exaustivas por causa, sem exceção crua; chave recusada oferece copiar a pública |
 | CMP-22 | P1-C | CMP-T10, CMP-T20 | Parcial — reconexão, backoff, biometria e buffer (CMP-T10) verificados; falta a tela |
 | CMP-23 | P1-C | CMP-T9, CMP-T13 | Verificada (`window-change` com colunas, linhas e pixels ao girar, `TerminalActivityTest`) |
 | CMP-24 | P1-D | CMP-T13, CMP-T17 | Parcial — `TerminalActivity`, abas, barra de estado e Voltar sem fechar sessões verificados (T13); falta a lista de sessões na aba (T17) |
@@ -440,9 +440,9 @@ Nenhuma. Q1–Q13 foram respondidas em 29/10 (D12–D24). Q8, Q9, Q10, Q11 e Q13
 | CMP-56 | P3-H | CMP-T32, CMP-T35 | Pending |
 | CMP-57 | P3-H | CMP-T19, CMP-T33, CMP-T36 | Pending |
 | CMP-58 | P3-H | CMP-T31, CMP-T35 | Pending |
-| CMP-59 | P2-I | CMP-T15, CMP-T17 | Parcial — seção Hosts pronta (T15), Chaves e Sessões são avisos até T16/T17 |
+| CMP-59 | P2-I | CMP-T15, CMP-T17 | Parcial — Hosts (T15) e Chaves (T16) prontos; Sessões e promoção da aba em T17 |
 | CMP-60 | P2-I | CMP-T17 | Pending |
-| CMP-61 | P2-I | CMP-T15, CMP-T16, CMP-T33 | Pending |
+| CMP-61 | P2-I | CMP-T15, CMP-T16, CMP-T33 | Parcial — textos de T15/T16 traduzidos, ordenados e sem duplicação; TranslationsTest 5/5; falta T33 |
 | CMP-62 | P2-I | CMP-T5, CMP-T31 | Parcial — regra de arquitetura `computador/` (CMP-T5) ativa; falta T31 |
 | CMP-63 | P2-I | CMP-T4, CMP-T20 | Partial (T4 verificada; T20 pendente) |
 | CMP-64 | P2-I | CMP-T18, CMP-T28, CMP-T36 | Pending |

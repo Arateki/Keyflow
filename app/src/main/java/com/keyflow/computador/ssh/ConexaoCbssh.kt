@@ -164,7 +164,12 @@ class ConexaoCbssh(
                     is VereditoDeConfianca.Mudou -> {
                         estado.causa = CausaSsh.CHAVE_DO_SERVIDOR_MUDOU
                         emitir(EventoConexao.ServidorMudou(v.antiga, v.nova))
-                        false
+                        if (!destino.confiarSozinho) return false
+                        estado.aguardandoUsuario.set(true)
+                        val ok = try {
+                            interacao.confirmarTrocaServidor(endereco, h.porta, key.type, v.antiga, v.nova)
+                        } finally { estado.aguardandoUsuario.set(false) }
+                        if (ok) { confianca.confiar(endereco, h.porta, chave); estado.causa = null; true } else false
                     }
                 }
             }

@@ -40,6 +40,13 @@ class ConexaoCbsshTest {
     private class Interacao(var confirma: Boolean = true, var senha: String? = null) : InteracaoComUsuario {
         var confirmacoes = 0
         var pedidosDeSenha = 0
+        var trocas = 0
+        val aguardandoTroca = CompletableDeferred<Unit>()
+        var segurarTroca: CompletableDeferred<Boolean>? = null
+        override suspend fun confirmarTrocaServidor(host: String, porta: Int, algoritmo: String, antiga: ImpressaoDigital, nova: ImpressaoDigital): Boolean {
+            trocas++; aguardandoTroca.complete(Unit)
+            return segurarTroca?.await() ?: false
+        }
         var impressaoVista: ImpressaoDigital? = null
         val aguardando = CompletableDeferred<Unit>()
         var segurar: CompletableDeferred<Boolean>? = null
@@ -201,6 +208,49 @@ class ConexaoCbsshTest {
             assertEquals(login0, s.tentativasDeLogin.get())
             assertEquals(0, i.confirmacoes)
             assertEquals(0, i.pedidosDeSenha)
+        }
+    }
+
+    @Test fun trocaDeliberadaSoGravaENegociaLoginDepoisDaResposta() = runBlocking(Dispatchers.IO) {
+        SshFixtureServer().use { s ->
+            val repo = RepositorioKnownHostsEmMemoria()
+            val primeira = conexao(repo, Interacao())
+            assertEquals(ResultadoConexao.Aberta, primeira.conectar(DestinoSsh(host(s), SshFixtureServer.SENHA_FALSA), pty))
+            primeira.fechar()
+            val real = repo.chavesConhecidas("127.0.0.1", s.porta).single()
+            val antiga = ChaveDoServidor(real.algoritmo, real.blob.copyOf().also { it[it.lastIndex] = (it.last() + 1).toByte() })
+            repo.confiar("127.0.0.1", s.porta, antiga)
+            val loginsAntes = s.tentativasDeLogin.get()
+            val i = Interacao().also { it.segurarTroca = CompletableDeferred() }
+            val c = conexao(repo, i)
+            val resultado = async { c.conectar(DestinoSsh(host(s), SshFixtureServer.SENHA_FALSA), pty) }
+            withTimeout(10_000) { i.aguardandoTroca.await() }
+            assertFalse(resultado.isCompleted)
+            assertEquals(loginsAntes, s.tentativasDeLogin.get())
+            assertEquals(antiga, repo.chavesConhecidas("127.0.0.1", s.porta).single())
+            i.segurarTroca!!.complete(true)
+            assertEquals(ResultadoConexao.Aberta, resultado.await())
+            assertEquals(real, repo.chavesConhecidas("127.0.0.1", s.porta).single())
+            c.fechar()
+        }
+    }
+
+    @Test fun agenteNuncaAbreDialogoNemSubstituiChaveMudada() = runBlocking(Dispatchers.IO) {
+        SshFixtureServer().use { s ->
+            val repo = RepositorioKnownHostsEmMemoria()
+            val primeira = conexao(repo, Interacao())
+            primeira.conectar(DestinoSsh(host(s), SshFixtureServer.SENHA_FALSA), pty); primeira.fechar()
+            val real = repo.chavesConhecidas("127.0.0.1", s.porta).single()
+            val antiga = ChaveDoServidor(real.algoritmo, real.blob.copyOf().also { it[it.lastIndex] = (it.last() + 1).toByte() })
+            repo.confiar("127.0.0.1", s.porta, antiga)
+            val antes = s.tentativasDeLogin.get()
+            val i = Interacao()
+            val c = conexao(repo, i)
+            assertEquals(ResultadoConexao.Falhou(CausaSsh.CHAVE_DO_SERVIDOR_MUDOU), c.conectar(DestinoSsh(host(s), SshFixtureServer.SENHA_FALSA, confiarSozinho = false), pty))
+            assertEquals(0, i.trocas)
+            assertEquals(antes, s.tentativasDeLogin.get())
+            assertEquals(antiga, repo.chavesConhecidas("127.0.0.1", s.porta).single())
+            c.fechar()
         }
     }
 
