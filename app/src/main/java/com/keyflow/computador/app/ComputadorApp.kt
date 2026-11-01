@@ -36,7 +36,9 @@ class ComputadorApp private constructor(private val contexto: Context, dependenc
     val repositorio = RepositorioComputador(settings, cofre, File(contexto.filesDir, "computador/known_hosts"))
     val interacao = InteracaoDoApp()
     val emuladores = EmuladoresDeSessao()
-    val provedorDeChaves = ProvedorDeChavesAndroid(cofre, BiometriaAndroid(contexto) { atividade.get().get() })
+    val autenticador = BiometriaAndroid(contexto) { atividade.get().get() }
+    val provedorDeChaves = ProvedorDeChavesAndroid(cofre, autenticador)
+    val acoesDeChaves by lazy { AcoesDeChavesReais(this) }
     private val rede = ObservadorDeRede(contexto)
 
     /** Cópia dos metadados das chaves para a decisão síncrona da reconexão (sem bloquear thread). */

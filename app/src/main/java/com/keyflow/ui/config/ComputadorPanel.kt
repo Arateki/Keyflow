@@ -38,8 +38,8 @@ enum class SecaoComputador(private val rotuloPt: String) {
 }
 
 /**
- * Aba Computador: **Hosts · Chaves · Sessões** (CMP-59), sem banner. Os hosts vêm do [dados]; as chaves e as sessões ganham tela nas próximas
- * etapas (CMP-T16 e T17) e aqui só avisam. Sem `delay` simulado: o "Testar conexão" é o real ([AcoesDeHost.testar]).
+ * Aba Computador: **Hosts · Chaves · Sessões** (CMP-59), sem banner. Os dados e as ações são portas explícitas;
+ * as sessões ganham tela na CMP-T17. Sem `delay` simulado: o "Testar conexão" é o real ([AcoesDeHost.testar]).
  */
 @Composable
 fun ComputadorPanel(
@@ -49,6 +49,7 @@ fun ComputadorPanel(
     acoes: AcoesDeHost,
     modifier: Modifier = Modifier,
     secaoInicial: SecaoComputador = SecaoComputador.HOSTS,
+    acoesChaves: AcoesDeChaves? = null,
 ) {
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
@@ -71,7 +72,11 @@ fun ComputadorPanel(
         )
         when (secao) {
             SecaoComputador.HOSTS -> ComputadorHosts(hosts.hosts, chaves, sessoes, acoes)
-            SecaoComputador.CHAVES -> InfoNote(tr("As chaves SSH ganham a própria seção na próxima etapa."), COMPUTADOR_EM_BREVE_TAG)
+            SecaoComputador.CHAVES -> {
+                val contexto = androidx.compose.ui.platform.LocalContext.current
+                val acoesEfetivas = acoesChaves ?: remember(contexto) { com.keyflow.computador.app.ComputadorApp.de(contexto).acoesDeChaves }
+                ComputadorChaves(chaves, hosts.hosts, acoesEfetivas)
+            }
             SecaoComputador.SESSOES -> InfoNote(tr("A lista de sessões chega na próxima etapa."), COMPUTADOR_EM_BREVE_TAG)
         }
     }
