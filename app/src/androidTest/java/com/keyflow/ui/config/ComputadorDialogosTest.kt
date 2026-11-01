@@ -75,15 +75,14 @@ class ComputadorDialogosTest {
     @Test fun toqueDuploNoRevisarNaoSubstitui() {
         val p = PedidoDeInteracao.ServidorMudou("ssh.example.org", 22, "ssh-ed25519", antiga, nova)
         regra.setContent { KeyFlowTheme(dark = false) { ServidorMudou(p) } }
-        regra.mainClock.autoAdvance = false
-        no("computador-servidor-revisar").performClick()
-        regra.mainClock.advanceTimeByFrame()
-        no("computador-servidor-substituir").assertIsNotEnabled().performClick()
-        regra.mainClock.advanceTimeByFrame()
+        // Dois toques no mesmo ponto, 100 ms entre eles: o segundo cai no lugar do Substituir, que ainda está em pausa.
+        no("computador-servidor-revisar").performTouchInput { click(center); advanceEventTime(100); click(center) }
+        regra.waitForIdle()
         assertFalse(p.resposta.isCompleted)
-        regra.mainClock.advanceTimeBy(PAUSA_ANTES_DE_SUBSTITUIR_MS + 100)
-        no("computador-servidor-substituir").assertIsEnabled().performClick()
-        regra.mainClock.autoAdvance = true
+        regra.waitUntil(5_000) { regra.onAllNodesWithTag("computador-servidor-substituir", useUnmergedTree = true).fetchSemanticsNodes()
+            .any { SemanticsProperties.Disabled !in it.config } }
+        no("computador-servidor-substituir").performClick()
+        regra.waitUntil(5_000) { p.resposta.isCompleted }
         assertTrue(runBlocking { p.resposta.await() })
     }
     @Test fun cancelarNoSegundoPassoNaoSubstitui() {
