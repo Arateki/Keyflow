@@ -12,13 +12,12 @@ import org.junit.Test
 class CodecNotificacaoPropertyTest {
 
     private val acao: Arb<AcaoDaOrbe> = arbitrary { rs ->
-        when (rs.random.nextInt(8)) {
+        when (rs.random.nextInt(7)) {
             0 -> AcaoDaOrbe.Nenhuma
             1 -> AcaoDaOrbe.GravarEnviar
             2 -> AcaoDaOrbe.RetrairExpandirTeclado
-            3 -> AcaoDaOrbe.TrocarTeclado
-            4 -> AcaoDaOrbe.LerTela
-            5 -> AcaoDaOrbe.RodarFluxo("f" + rs.random.nextInt(1000))
+            3 -> AcaoDaOrbe.LerTela
+            4 -> AcaoDaOrbe.RodarFluxo("f" + rs.random.nextInt(1000))
             // um id que o parser desta versão não conhece (e que não colide com os conhecidos nem com `flow:`)
             else -> AcaoDaOrbe.Desconhecida("x" + rs.random.nextInt(1000) + "_novo")
         }

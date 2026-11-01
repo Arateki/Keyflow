@@ -17,7 +17,7 @@ import org.junit.Test
 class NotificacaoHostTest {
     private val escopo = TestScope()
     private var config = ConfigNotificacao()
-    private var settings = Settings(shortcutOverflow = ShortcutOverflow.NEAREST_DOWN, shortcut2Tap = OrbShortcutAction.TOGGLE_KEYBOARD, shortcut3Tap = OrbShortcutAction.SWITCH_IME)
+    private var settings = Settings(shortcutOverflow = ShortcutOverflow.NEAREST_DOWN, shortcut2Tap = OrbShortcutAction.TOGGLE_KEYBOARD, shortcut3Tap = OrbShortcutAction.VISION_MODE)
     private var bloqueada = false
     private var estado = ButtonState.IDLE_READY
     private var visao = false
@@ -55,7 +55,7 @@ class NotificacaoHostTest {
         chamadas.clear(); toques(h, 2)
         assertThat(chamadas).containsExactly("executar:${AcaoDaOrbe.RetrairExpandirTeclado}")
         chamadas.clear(); toques(h, 3)
-        assertThat(chamadas).containsExactly("executar:${AcaoDaOrbe.TrocarTeclado}")
+        assertThat(chamadas).containsExactly("executar:${AcaoDaOrbe.LerTela}")
     }
 
     @Test
@@ -86,7 +86,7 @@ class NotificacaoHostTest {
     fun `5 toques cai conforme o overflow`() {
         val h = host()
         toques(h, 5, passo = 40)
-        assertThat(chamadas).containsExactly("executar:${AcaoDaOrbe.TrocarTeclado}")
+        assertThat(chamadas).containsExactly("executar:${AcaoDaOrbe.LerTela}")
         chamadas.clear(); settings = settings.copy(shortcutOverflow = ShortcutOverflow.CANCEL)
         toques(h, 5, passo = 40)
         assertThat(chamadas).isEmpty()
@@ -135,10 +135,10 @@ class NotificacaoHostTest {
         toques(h, 2)
         assertThat(chamadas).isEmpty()
         assertThat(avisos).containsExactly(AvisoDaNotificacao.PRECISA_DESBLOQUEIO)
-        // trocar o teclado (também Activity) idem; já o que não abre Activity (retrair) age
+        // O terceiro toque padrão agora é Nenhuma (D14): não abre seletor nem avisa.
         avisos.clear()
         toques(h, 3)
-        assertThat(avisos).containsExactly(AvisoDaNotificacao.PRECISA_DESBLOQUEIO)
+        assertThat(avisos).isEmpty()
     }
 
     @Test

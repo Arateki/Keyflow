@@ -21,7 +21,6 @@ sealed interface AcaoDaOrbe {
     /** Tocar para começar / tocar para parar (D12). Nenhum toque é obrigado a tê-la (D16). */
     data object GravarEnviar : AcaoDaOrbe
     data object RetrairExpandirTeclado : AcaoDaOrbe
-    data object TrocarTeclado : AcaoDaOrbe
     data object LerTela : AcaoDaOrbe
 
     /** Reservada (NTF-39): lida e guardada, sem efeito antes de Fluxos. */
@@ -40,7 +39,7 @@ data class ConfigNotificacao(
     val skin: String = SKIN_PADRAO,
     val acao1Toque: AcaoDaOrbe = AcaoDaOrbe.GravarEnviar,
     val acao2Toques: AcaoDaOrbe = AcaoDaOrbe.RetrairExpandirTeclado,
-    val acao3Toques: AcaoDaOrbe = AcaoDaOrbe.TrocarTeclado,
+    val acao3Toques: AcaoDaOrbe = AcaoDaOrbe.Nenhuma,
 ) {
     fun acaoParaToques(toques: Int): AcaoDaOrbe? = when (toques) {
         1 -> acao1Toque
@@ -88,7 +87,7 @@ data class ConfigEfetiva(
 fun acaoDoAtalho(atalho: OrbShortcutAction): AcaoDaOrbe = when (atalho) {
     OrbShortcutAction.NONE -> AcaoDaOrbe.Nenhuma
     OrbShortcutAction.TOGGLE_KEYBOARD -> AcaoDaOrbe.RetrairExpandirTeclado
-    OrbShortcutAction.SWITCH_IME -> AcaoDaOrbe.TrocarTeclado
+    OrbShortcutAction.SWITCH_IME -> AcaoDaOrbe.Nenhuma
     OrbShortcutAction.VISION_MODE -> AcaoDaOrbe.LerTela
 }
 

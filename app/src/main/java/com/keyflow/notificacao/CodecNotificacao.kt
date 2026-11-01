@@ -29,7 +29,6 @@ object CodecNotificacao {
         AcaoDaOrbe.Nenhuma -> ID_NENHUMA
         AcaoDaOrbe.GravarEnviar -> ID_GRAVAR_ENVIAR
         AcaoDaOrbe.RetrairExpandirTeclado -> ID_RETRAIR_EXPANDIR
-        AcaoDaOrbe.TrocarTeclado -> ID_TROCAR_TECLADO
         AcaoDaOrbe.LerTela -> ID_LER_TELA
         is AcaoDaOrbe.RodarFluxo -> PREFIXO_FLUXO + acao.fluxoId
         is AcaoDaOrbe.Desconhecida -> acao.id
@@ -39,7 +38,7 @@ object CodecNotificacao {
         id == ID_NENHUMA -> AcaoDaOrbe.Nenhuma
         id == ID_GRAVAR_ENVIAR -> AcaoDaOrbe.GravarEnviar
         id == ID_RETRAIR_EXPANDIR -> AcaoDaOrbe.RetrairExpandirTeclado
-        id == ID_TROCAR_TECLADO -> AcaoDaOrbe.TrocarTeclado
+        id == ID_TROCAR_TECLADO -> AcaoDaOrbe.Nenhuma // D14: migração do catálogo antigo, sem inventar gravação
         id == ID_LER_TELA -> AcaoDaOrbe.LerTela
         id.startsWith(PREFIXO_FLUXO) && id.length > PREFIXO_FLUXO.length -> AcaoDaOrbe.RodarFluxo(id.substring(PREFIXO_FLUXO.length))
         else -> AcaoDaOrbe.Desconhecida(id)

@@ -37,7 +37,7 @@ desfazer, `visionFlow`, `TOGGLE_KEYBOARD`, `showInputMethodPicker`). Por isso:
                                        │ Comando                                                           handleKeyboardMicTap
                                        ▼                                                                   handlePauseResume / handleCancel
                                    executa ───────────────────────────────────────────────────────────►    coordinator.onUndoCancel
-                                                                                                           visionFlow / TOGGLE / SWITCH_IME
+                                                                                                           visionFlow / TOGGLE
  botão (Pausar/Retomar/Descartar/Desfazer/Encerrar) ──PendingIntent──► ACTION_NOTIF_PAUSE_RESUME|CANCEL|UNDO ──► PortaoDeToque ──► handlePauseResume / handleCancel / onUndoCancel   (não conta toques)
  corpo ──contentIntent(getActivity)──► abre o KeyFlow  (o equivalente do arrasto ↓)
  dispensar ──deleteIntent──► ACTION_NOTIF_DISMISSED ──► VisibilidadeDaNotificacao (memória, sem DataStore)
@@ -147,6 +147,8 @@ object BotoesDaNotificacao { fun para(estado: ButtonState, visaoAtiva: Boolean):
   da tabela não produz botão. É assim que "todo arrasto com efeito ganha botão" deixa de ser uma intenção.
 - **PTT**: a notificação não tem PTT; os botões seguem a tabela de Alternar qualquer que seja o `overlayRecordingMode` (A17).
 
+**D14 — decisão do Yan de 31/10/2026:** Ler a tela fica no catálogo com as restrições atuais (sobreposição e aparelho desbloqueado; senão avisa). Trocar o teclado sai: o sistema já oferece o seletor. O codec migra `switch_ime` para `Nenhuma` e a cópia da orbe principal também converte `SWITCH_IME` em `Nenhuma`. A busca de solução melhor continua somente para Ler a tela.
+
 ## 4. Configuração e persistência (`NTF-36..38`)
 
 ```kotlin
@@ -154,7 +156,6 @@ sealed interface AcaoDaOrbe {                       // o catálogo de 1, 2 e 3 t
     data object Nenhuma : AcaoDaOrbe
     data object GravarEnviar : AcaoDaOrbe           // tocar para começar / tocar para parar (D12)
     data object RetrairExpandirTeclado : AcaoDaOrbe
-    data object TrocarTeclado : AcaoDaOrbe          // Activity fora do KeyFlow-como-teclado: ver D14
     data object LerTela : AcaoDaOrbe                // Activity: ver D14
     data class RodarFluxo(val fluxoId: String) : AcaoDaOrbe     // reservada (NTF-39): lida e guardada, sem efeito antes de Fluxos
     data class Desconhecida(val id: String) : AcaoDaOrbe         // JSON de versão mais nova: preservada, tratada como Nenhuma
@@ -167,7 +168,7 @@ data class ConfigNotificacao(
     val skin: String = "atelie",                  // id de skin: "sistema" | OrbStyle.id | "pack:<id>"
     val acao1Toque: AcaoDaOrbe = GravarEnviar,
     val acao2Toques: AcaoDaOrbe = RetrairExpandirTeclado,
-    val acao3Toques: AcaoDaOrbe = TrocarTeclado,
+    val acao3Toques: AcaoDaOrbe = Nenhuma,
 )
 
 /** O que vale agora: com `copiar`, a skin e as ações efetivas de 1, 2 e 3 toques vêm da orbe principal (D16: Alternar copia gravar/enviar no 1 toque; PTT copia `shortcut1Tap`, inclusive Nenhuma). */
@@ -181,7 +182,7 @@ fun efetiva(config: ConfigNotificacao, settings: Settings): ConfigEfetiva
 ```
 
 - Com copiar ligado: `acao1 = GravarEnviar` no Alternar; no PTT, `shortcut1Tap` pelo mapa abaixo (inclusive Nenhuma). `acao2/3` vêm de `shortcut2Tap/3Tap`; sem copiar usa as três ações próprias. Não há fallback que imponha GravarEnviar (NTF-10/12).
-- Mapa `OrbShortcutAction` → `AcaoDaOrbe`: `NONE → Nenhuma`, `TOGGLE_KEYBOARD → RetrairExpandirTeclado`, `SWITCH_IME → TrocarTeclado`,
+- Mapa `OrbShortcutAction` → `AcaoDaOrbe`: `NONE → Nenhuma`, `TOGGLE_KEYBOARD → RetrairExpandirTeclado`, `SWITCH_IME → Nenhuma` (D14, 31/10; o seletor já é oferecido pelo sistema),
   `VISION_MODE → LerTela`. **Pausar/retomar e cancelar/desfazer não são ações do catálogo**: são os botões (§3.1).
 - **JSON** `notification_config_json`, ao lado de `bars_config_json` (`SettingsRepository.kt:876`):
 
@@ -233,7 +234,7 @@ class RajadaDeToques { fun toque(): Int; fun fechar(): Int }                  //
 
 sealed interface Comando {
     data object GravarEnviar : Comando                    // a semântica de handleKeyboardMicTap (inclui encerrar a Visão), onde estiver (D12, D16)
-    data class Executar(val acao: AcaoDaOrbe) : Comando   // RetrairExpandirTeclado, TrocarTeclado, LerTela
+    data class Executar(val acao: AcaoDaOrbe) : Comando   // RetrairExpandirTeclado, LerTela
     data class RodarFluxo(val fluxoId: String) : Comando  // reservado (NTF-39)
     data object FluxoIncompleto : Comando                 // reservado: aviso, não executa a ação por baixo
     data object Nada : Comando
@@ -251,7 +252,7 @@ Regras de `resolver` (todas testadas na JVM):
 - `toques ≥ 4`: `CANCEL → Nada`; `NEAREST_DOWN` → o maior `n ∈ {3, 2}` cuja ação (ou fluxo) não é `Nenhuma`, e então como se fossem `n` toques; nenhum → `Nada`
   (o 1 toque não entra no overflow, como na orbe principal).
 - `toques ∈ {1, 2, 3}` → primeiro o gancho de fluxo (NTF-39; na notificação também o 1 toque); sem fluxo, a ação da interação (`efetiva.acao1/2/3`), com os portões: `GravarEnviar → Comando.GravarEnviar` (sempre age, inclusive com a Visão ativa);
-  `RetrairExpandirTeclado` só com `tecladoVisivel`; `TrocarTeclado`/`LerTela → Executar` (o portão de Activity é do host); **com `visaoAtiva` só `GravarEnviar` age**, as demais → `Nada`;
+  `RetrairExpandirTeclado` só com `tecladoVisivel`; `LerTela → Executar` (o portão de Activity é do host); **com `visaoAtiva` só `GravarEnviar` age**, as demais → `Nada`;
   `Desconhecida`/`RodarFluxo` sem Fluxos → `Nada`.
 - Nenhum toque é reescrito para `GravarEnviar` quando a configuração não o tem (D16).
 
@@ -264,7 +265,7 @@ Regras de `resolver` (todas testadas na JVM):
 | Botão **Descartar** / **Encerrar** (`ACTION_NOTIF_CANCEL`) | `handleCancel()` (com a Visão ativa ele encerra a Visão: `visionFlow.finish()`) |
 | Botão **Desfazer** (`ACTION_NOTIF_UNDO`) | `coordinator.onUndoCancel()` |
 | `Executar(RetrairExpandirTeclado)` | `KeyFlowController.requestToggleKeyboardExpand()` (só com `keyboardVisible`) |
-| `Executar(TrocarTeclado)`, `Executar(LerTela)` | o mesmo ramo de `handleOrbShortcut` (`:829`) — **Activity**: passam por `PortaoDeToque` com `precisaDeActivity = true` (NTF-16) e pela checagem da permissão de sobreposição (L10, **item em aberto D14**) |
+| `Executar(LerTela)` | o mesmo ramo de `handleOrbShortcut` (`:829`) — **Activity**: passam por `PortaoDeToque` com `precisaDeActivity = true` (NTF-16) e pela checagem da permissão de sobreposição (L10, **item em aberto D14**) |
 
 O `when` de `handleOrbShortcut` é extraído para uma função `executarAcaoDeAtalho(acao)` usada pela orbe flutuante **e** pela
 notificação — a orbe flutuante continua igual (goldens e testes sem mudança).
@@ -458,7 +459,7 @@ class VisibilidadeDaNotificacao {
   Usada: (a) com `mostrar = false`; (b) no `startForeground` enquanto a aparência ainda não está pronta; (c) quando a aparência
   falha por completo. `promoteToForeground` (`:243`) passa a pedir ao `PostadorDaNotificacao` a notificação **inicial** em vez de
   `recordingNotification.build(...)`, e `startForeground` **nunca** recebe nulo.
-- **Canais**: `keyflow_overlay` fica como está (`IMPORTANCE_LOW`, `:1179-1188`); `keyflow_overlay_min` é novo. O botão "Ajustes do
+- **Canais**: `keyflow_overlay` fica como está (`IMPORTANCE_LOW`, `:1179-1188`); `keyflow_overlay_min` é novo e solicitado com `IMPORTANCE_MIN`; o Android 14 pode promovê-lo a `LOW` no primeiro FGS (restrição medida e fonte na lição `2026-11-01-notificacao-c.md`). O botão "Ajustes do
   sistema" abre o canal da orbe.
 - **Permissão** (NTF-22): o `PostadorDaNotificacao` captura qualquer falha de `notify` e confere `areNotificationsEnabled()`; sem
   permissão ele não posta e não falha.
@@ -476,7 +477,7 @@ fun avaliar(bloqueada: Boolean, permitir: Boolean, precisaDeActivity: Boolean): 
 - `bloqueada = KeyguardManager.isKeyguardLocked()` (cobre também o bloqueio "por deslizar"; `isDeviceLocked` só vale com bloqueio seguro).
   Injetável, para a JVM e para o teste instrumentado.
 - **Duas checagens**: a primeira, ao tocar na orbe **ou num botão**, antes de contar/agir (`precisaDeActivity = false`); a segunda, ao resolver a rajada em
-  `TrocarTeclado`/`LerTela`, com `precisaDeActivity = true` (a Activity exigiria o desbloqueio de qualquer jeito, L4).
+  `LerTela`, com `precisaDeActivity = true` (a Activity exigiria o desbloqueio de qualquer jeito, L4).
 - **Versão pública** (`setPublicVersion`): uma `Notification` com a mesma `notif_orb`, mas com a orbe **em repouso**, sem
   `Chronometer` e **sem botões** quando `permitirComTelaBloqueada = false`; com `true`, o mesmo conteúdo do estado real, com os botões. O clique da versão pública
   é o mesmo `PendingIntent` (a defesa é a checagem no toque, não a visibilidade — L5).
@@ -490,8 +491,8 @@ fun avaliar(bloqueada: Boolean, permitir: Boolean, precisaDeActivity: Boolean): 
   notificação (`OverlayService.kt:680-682`); os banners do overlay continuam com o tema do app.
 - **Idioma**: o re-post no idioma novo já existe (`:669`) e continua.
 - **Coalescência** (`PostadorDaNotificacao`): `solicitar(estado)` registra o último estado e dispara, num dispatcher de fundo, um único
-  `notify` por janela curta (`delay` de ~200 ms com o último valor vencendo — `conflate`). O número que o sistema tolera (L11) é
-  confirmado na NTF-T11; a regra "no máximo um por janela, o último vence" vale qualquer que seja o número. Nada de montar
+  `notify` por janela de **250 ms** com o último valor vencendo (canal conflado). O AOSP 14 usa padrão de 5 atualizações/s por app,
+  ajustável pelo sistema (L11; fonte e exceções na lição `2026-11-01-notificacao-c.md`); a regra nossa independe desse padrão. Nada de montar
   `RemoteViews` na thread principal; `notify` é seguro fora dela.
 - **Primeiro plano**: `startForeground` recebe a notificação pronta *se o cache tem a aparência* (aquecido no `onCreate` do serviço
   e a cada troca de skin); senão a mínima, e o postador troca assim que o bitmap fica pronto.
@@ -507,7 +508,7 @@ e, no `pool`, `--confirmo-a32`. **Nunca definir PIN pelo `adb` no aparelho do Ya
 | **Tela bloqueada** | emulador (bloqueio por deslizar: `UiDevice.sleep()` / `wakeUp()`); Vaio, Tab e **A32** pelo **roteiro do Yan** (PIN dele) | `NotificacaoTelaBloqueadaTest`: com a opção desligada, tocar a orbe com `isKeyguardLocked()` verdadeiro não inicia gravação (`KeyFlowController.buttonState` segue ocioso) e mostra o aviso, e **um botão (Pausar/Descartar) numa gravação em curso também é recusado**; ligada, a orbe e os botões agem; "Ler a tela" bloqueado é recusado; a versão pública não traz estado nem botões | os cinco casos; resultado do `Toast` sobre o bloqueio registrado (decide A12) |
 | **Dispensar** | emulador (Android 14), Tab S10 Lite (Android 16), **A32** se ≥ 14: dispensa; Vaio (Android 13): **não** dispensa | `NotificacaoDispensarTest`: gesto de dispensar por UiAutomator; compara as preferências do DataStore antes/depois; muda o estado (pausa, envia) e confere que **não** volta; inicia gravação → volta; abre a aba → volta; `deleteIntent` dispara (ou ativa o plano B de §9) | serviço vivo; DataStore idêntico; nenhuma reaparição nas mudanças de estado; volta nos dois eventos; no Android 13 a notificação permanece |
 | Atraso de exibição do primeiro plano (L12) | emulador, Tab S10 Lite | cronometra `startForegroundService` → notificação visível | < 2 s com `FOREGROUND_SERVICE_IMMEDIATE`; senão registra |
-| Activity a partir do serviço (L10) | emulador, A32 | "Ler a tela" e "Trocar o teclado" pela notificação, com e sem `SYSTEM_ALERT_WINDOW` | com a permissão: abre; sem: aviso. Resultado alimenta o **item em aberto D14** (o Yan vai buscar uma solução melhor) |
+| Activity a partir do serviço (L10) | emulador, A32 | "Ler a tela" pela notificação, com e sem `SYSTEM_ALERT_WINDOW` | com a permissão: abre; sem: aviso. Resultado alimenta o **item em aberto D14** (o Yan vai buscar uma solução melhor) |
 | Taxa de `notify` (L11) | emulador | 20 mudanças de estado em 1 s | último estado visível; nenhuma exceção |
 | Render do fabricante | A32 (One UI), Tab S10 Lite | captura da notificação e comparação visual com o golden | sem corte, sem fundo estranho; diferenças registradas |
 
@@ -535,9 +536,9 @@ Tema/paleta da aba (`LocalKeyFlowPalette`, `SpaceGrotesk`), `verticalScrollbar`,
  │ INTERAÇÕES                                    │
  │  1 toque       [ Gravar / enviar           ▾] │
  │  2 toques      [ Retrair/expandir o teclado ▾]│
- │  3 toques      [ Trocar o teclado          ▾] │
+ │  3 toques      [ Nenhuma                  ▾] │
  │  ⚠ Nenhum toque inicia a gravação.   (só aparece se nenhum estiver em Gravar / enviar)
- │  ⚠ Ler a tela e Trocar o teclado precisam da permissão de sobreposição e do aparelho desbloqueado.   (item em aberto, D14)
+ │  ⚠ Ler a tela precisa da permissão de sobreposição e do aparelho desbloqueado.   (item em aberto, D14)
  │  Botões (automáticos): Pausar · Retomar · Descartar · Desfazer — são os arrastos da orbe flutuante
  │  Não existem na notificação: segurar (a gravação é alternar) · arrastar ↑ → botão · lateral → botão · ↓ → toque no corpo
  │ TELA BLOQUEADA                                │
@@ -552,7 +553,7 @@ Tema/paleta da aba (`LocalKeyFlowPalette`, `SpaceGrotesk`), `verticalScrollbar`,
 - **Skins**: o componente `SkinPacksSection` existente ganha a superfície `NOTIFICACAO` (lista as skins nativas e os pacotes com
   notificação, importar e remover como nas abas Sobrepor/Teclado). Skin paga sem o direito aparece travada com o cadeado de hoje.
 - **Interações**: o seletor de ação de 1, 2 e 3 toques reusa a folha de ações das barras (`ShortcutActionSheet`) com o catálogo da
-  NTF-11 (Nenhuma · Gravar/enviar · Retrair/expandir · Trocar o teclado · Ler a tela); "Rodar fluxo" só aparece quando Fluxos existir (NTF-39).
+  NTF-11 (Nenhuma · Gravar/enviar · Retrair/expandir · Ler a tela); "Rodar fluxo" só aparece quando Fluxos existir (NTF-39).
 - A seção **Aparência** e **Interações** ficam somente leitura com "copiar" ligado, mostrando os valores efetivos.
 
 **Rotas de galeria** (`RouteCatalog`): `config-notificacao` (copiar ligado, Ateliê, concedida), `config-notificacao-propria` (copiar desligado com
@@ -584,7 +585,7 @@ Tema/paleta da aba (`LocalKeyFlowPalette`, `SpaceGrotesk`), `verticalScrollbar`,
 | Construtor | `NotificacaoDaOrbeTest` | `PRIVATE` + `publicVersion` (sem botões quando bloqueada e desligada); um clique na orbe e um por botão, cada botão com a ação dedicada; botões por estado (tabela de §6) e orbe no centro; `contentIntent`/`deleteIntent`; sem `bigContentView`; descrição por estado; soma de bitmaps; **sem texto** (`NotificacaoSemTextoTest`) | instrumentado |
 | Serviço | `OverlayServiceNotificacaoTest` | toque → 1/2/3 toques executam a ação certa (portas e relógio injetados; o toque remapeado para Gravar/enviar grava); **cada botão** age (Pausar/Retomar, Descartar, Desfazer, Encerrar) e é ignorado se o estado já mudou; bloqueada recusa a orbe e os botões; "dispensada" não re-posta; volta em gravação e na aba; mínima com `mostrar = false`; `startForeground` nunca nulo; troca de skin/modo noturno re-posta | instrumentado |
 | Provas | `NotificacaoAlturaTest`, `NotificacaoTelaBloqueadaTest`, `NotificacaoDispensarTest` (§12) | os critérios de §12 | instrumentado/UiAutomator |
-| UI | `NotificacaoPanelTest` | seções, permissão, interruptores, copiar (somente leitura + onde foi parar cada interação ausente; Alternar copia 1=Gravar/enviar; PTT copia `shortcut1Tap` inclusive Nenhuma, sem inventar gravação), ações de 1/2/3 toques, aviso de "nenhum toque inicia" sem bloquear, aviso genérico ao substituir qualquer ação atribuída (cancelar não grava), aviso de Ler a tela/Trocar o teclado, skins (paga travada), prévia por estado com os botões | instrumentado (Compose) |
+| UI | `NotificacaoPanelTest` | seções, permissão, interruptores, copiar (somente leitura + onde foi parar cada interação ausente; Alternar copia 1=Gravar/enviar; PTT copia `shortcut1Tap` inclusive Nenhuma, sem inventar gravação), ações de 1/2/3 toques, aviso de "nenhum toque inicia" sem bloquear, aviso genérico ao substituir qualquer ação atribuída (cancelar não grava), aviso de Ler a tela, skins (paga travada), prévia por estado com os botões | instrumentado (Compose) |
 | Aba | `ConfigScreenTest` (ajustado) | `deferredTabsShowComingSoonCardWithoutControls` sem `NOTIFICACAO`; a aba mostra `NOTIFICACAO_PANEL_TAG` | instrumentado |
 | Goldens | rotas de §13 × claro/escuro | `pool telas`; `--approve` só destas | screenshot |
 | Manual [YAN] | `manual-validation.md` (NTF-T18) | A32: bloqueio com PIN, skins pagas e pacote, dispensar, latência | manual |
@@ -615,7 +616,7 @@ Para a notificação:
 | **Desenhar a orbe fora do Compose** exige tocar `VoiceOrb.kt`/`MascotOrb.kt` (arquivos de outras frentes) | só tornar `internal` e extrair o ponto de entrada; spike na NTF-T6; goldens da orbe flutuante bit-idênticos; conflito resolvido por rebase curto |
 | **Dispensar no 14+ sem `deleteIntent` confiável** | plano B de §9 (`getActiveNotifications`); decidido na NTF-T14 |
 | **Rajada de toques com latência** (janela de 250 ms + IPC) | é a mesma janela da orbe (A13); medida no roteiro do Yan; o slider "Tempo de reação" já a ajusta |
-| **Ações com Activity** (Visão, seletor) bloqueadas no Android 12+ | tabela L10 + provas; sem a permissão de sobreposição, aviso — **item em aberto D14** (o Yan vai procurar uma solução melhor) |
+| **Ação com Activity** (Ler a tela) bloqueadas no Android 12+ | tabela L10 + provas; sem a permissão de sobreposição, aviso — **item em aberto D14** (o Yan vai procurar uma solução melhor) |
 | **Um arrasto novo na orbe flutuante sem botão na notificação** | `ArrastosDaOrbe` + `ArrastosDaOrbeConformidadeTest` (instrumentado) + `BotoesDaNotificacaoTest` (JVM) falham; a regra é verificável |
 | **Botão que chega depois de o estado mudar** (toque lento) | os tratadores já ignoram o estado errado (`handlePauseResume`, `onCancel`, `onUndoCancel`); o host confere o estado e ignora, sem erro |
 | **`SYSTEM_ALERT_WINDOW` ausente no modo só-teclado** | a notificação só existe durante a sessão; as ações de Activity avisam |

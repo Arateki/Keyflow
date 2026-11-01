@@ -18,7 +18,7 @@ interface AcoesDaNotificacao {
     fun descartar()
     fun desfazer()
 
-    /** `RetrairExpandirTeclado`, `TrocarTeclado` ou `LerTela` (o mesmo `executarAcaoDeAtalho` da orbe flutuante). */
+    /** `RetrairExpandirTeclado` ou `LerTela` (o mesmo `executarAcaoDeAtalho` da orbe flutuante). */
     fun executar(acao: AcaoDaOrbe)
     fun rodarFluxo(fluxoId: String)
 }
@@ -52,6 +52,9 @@ class NotificacaoHost(
     private val vibrar: () -> Unit,
     private val fluxos: GanchoDeFluxoDaNotificacao = { null },
 ) {
+    /** Presença em memória da sessão: dispensar nunca altera a configuração persistida. */
+    val visibilidade = VisibilidadeDaNotificacao()
+
     private val rajada = RajadaDeToques(relogio) { settings().tapBurstWindowMs.toLong() }
     private var fechamento: Job? = null
 
@@ -133,5 +136,5 @@ class NotificacaoHost(
         rajada.fechar()
     }
 
-    private fun AcaoDaOrbe.abreActivity(): Boolean = this == AcaoDaOrbe.TrocarTeclado || this == AcaoDaOrbe.LerTela
+    private fun AcaoDaOrbe.abreActivity(): Boolean = this == AcaoDaOrbe.LerTela
 }

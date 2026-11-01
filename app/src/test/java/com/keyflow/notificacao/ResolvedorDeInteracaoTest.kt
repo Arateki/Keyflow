@@ -8,7 +8,7 @@ import org.junit.Test
 /** NTF-T4: da rajada assentada à ação (NTF-10, NTF-11, NTF-39, design §5). */
 class ResolvedorDeInteracaoTest {
 
-    private fun ef(a1: AcaoDaOrbe = AcaoDaOrbe.GravarEnviar, a2: AcaoDaOrbe = AcaoDaOrbe.RetrairExpandirTeclado, a3: AcaoDaOrbe = AcaoDaOrbe.TrocarTeclado) =
+    private fun ef(a1: AcaoDaOrbe = AcaoDaOrbe.GravarEnviar, a2: AcaoDaOrbe = AcaoDaOrbe.RetrairExpandirTeclado, a3: AcaoDaOrbe = AcaoDaOrbe.LerTela) =
         efetiva(ConfigNotificacao(copiarDaOrbePrincipal = false, acao1Toque = a1, acao2Toques = a2, acao3Toques = a3), com.keyflow.data.Settings())
 
     private fun r(
@@ -24,7 +24,7 @@ class ResolvedorDeInteracaoTest {
     fun `cada toque executa a acao da sua interacao`() {
         assertThat(r(1)).isEqualTo(Comando.GravarEnviar)
         assertThat(r(2)).isEqualTo(Comando.Executar(AcaoDaOrbe.RetrairExpandirTeclado))
-        assertThat(r(3)).isEqualTo(Comando.Executar(AcaoDaOrbe.TrocarTeclado))
+        assertThat(r(3)).isEqualTo(Comando.Executar(AcaoDaOrbe.LerTela))
         assertThat(r(0)).isEqualTo(Comando.Nada)
     }
 
@@ -46,7 +46,7 @@ class ResolvedorDeInteracaoTest {
     fun `retrair so com o teclado visivel`() {
         assertThat(r(2, teclado = false)).isEqualTo(Comando.Nada)
         assertThat(r(2, teclado = true)).isEqualTo(Comando.Executar(AcaoDaOrbe.RetrairExpandirTeclado))
-        assertThat(r(3, teclado = false)).isEqualTo(Comando.Executar(AcaoDaOrbe.TrocarTeclado))
+        assertThat(r(3, teclado = false)).isEqualTo(Comando.Executar(AcaoDaOrbe.LerTela))
     }
 
     @Test
@@ -63,7 +63,7 @@ class ResolvedorDeInteracaoTest {
 
     @Test
     fun `NEAREST_DOWN com cinco toques cai no 3, ou no 2 se o 3 e Nenhuma`() {
-        assertThat(r(5)).isEqualTo(Comando.Executar(AcaoDaOrbe.TrocarTeclado))
+        assertThat(r(5)).isEqualTo(Comando.Executar(AcaoDaOrbe.LerTela))
         assertThat(r(4, ef(a3 = AcaoDaOrbe.Nenhuma))).isEqualTo(Comando.Executar(AcaoDaOrbe.RetrairExpandirTeclado))
     }
 

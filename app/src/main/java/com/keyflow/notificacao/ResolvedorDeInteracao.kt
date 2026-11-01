@@ -8,7 +8,7 @@ sealed interface Comando {
     /** A semântica de `handleKeyboardMicTap` (inclui encerrar a Visão), onde estiver (D12, D16). */
     data object GravarEnviar : Comando
 
-    /** `RetrairExpandirTeclado`, `TrocarTeclado` ou `LerTela`; o portão de Activity é do host. */
+    /** `RetrairExpandirTeclado` ou `LerTela`; o portão de Activity é do host. */
     data class Executar(val acao: AcaoDaOrbe) : Comando
 
     /** Reservado (NTF-39). */
@@ -29,7 +29,7 @@ typealias GanchoDeFluxoDaNotificacao = (toques: Int) -> ResolucaoDeFluxo?
  * - `toques >= 4`: `CANCEL` → [Comando.Nada]; `NEAREST_DOWN` → o maior `n` em {3, 2} cuja ação (ou fluxo) não é inerte, e então como
  *   se fossem `n` toques; nenhum → [Comando.Nada] (o 1 toque não entra no overflow, como na orbe principal).
  * - `toques` em 1..3: primeiro o gancho de fluxo (na notificação também o 1 toque); senão a ação da interação, com os portões:
- *   `GravarEnviar` sempre age; `RetrairExpandirTeclado` só com [tecladoVisivel]; `TrocarTeclado`/`LerTela` viram [Comando.Executar];
+ *   `GravarEnviar` sempre age; `RetrairExpandirTeclado` só com [tecladoVisivel]; `LerTela` viram [Comando.Executar];
  *   **com a [visaoAtiva] só `GravarEnviar` age**; `Desconhecida`/`RodarFluxo` sem Fluxos → [Comando.Nada].
  */
 fun resolver(
@@ -61,7 +61,7 @@ fun resolver(
         AcaoDaOrbe.GravarEnviar -> Comando.GravarEnviar
         AcaoDaOrbe.Nenhuma -> Comando.Nada
         AcaoDaOrbe.RetrairExpandirTeclado -> if (tecladoVisivel) Comando.Executar(acao) else Comando.Nada
-        AcaoDaOrbe.TrocarTeclado, AcaoDaOrbe.LerTela -> Comando.Executar(acao)
+        AcaoDaOrbe.LerTela -> Comando.Executar(acao)
         is AcaoDaOrbe.RodarFluxo, is AcaoDaOrbe.Desconhecida -> Comando.Nada
     }
 }

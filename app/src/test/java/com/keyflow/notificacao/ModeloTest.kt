@@ -55,7 +55,7 @@ class ModeloTest {
         assertThat(c.skin).isEqualTo("atelie")
         assertThat(c.acao1Toque).isEqualTo(AcaoDaOrbe.GravarEnviar)
         assertThat(c.acao2Toques).isEqualTo(AcaoDaOrbe.RetrairExpandirTeclado)
-        assertThat(c.acao3Toques).isEqualTo(AcaoDaOrbe.TrocarTeclado)
+        assertThat(c.acao3Toques).isEqualTo(AcaoDaOrbe.Nenhuma)
     }
 
     @Test
@@ -64,7 +64,7 @@ class ModeloTest {
         assertThat(e.copiado).isTrue()
         assertThat(e.skin).isEqualTo("aero")
         assertThat(e.acao1).isEqualTo(AcaoDaOrbe.GravarEnviar)
-        assertThat(e.acao2).isEqualTo(AcaoDaOrbe.TrocarTeclado)
+        assertThat(e.acao2).isEqualTo(AcaoDaOrbe.Nenhuma)
         assertThat(e.acao3).isEqualTo(AcaoDaOrbe.Nenhuma)
         assertThat(e.iniciaGravacao).isTrue()
     }
@@ -109,7 +109,7 @@ class ModeloTest {
         assertThat(depois.mostrar).isFalse()
         assertThat(depois.skin).isEqualTo("aero")
         assertThat(depois.acao1Toque).isEqualTo(AcaoDaOrbe.LerTela)
-        assertThat(depois.acao2Toques).isEqualTo(AcaoDaOrbe.TrocarTeclado)
+        assertThat(depois.acao2Toques).isEqualTo(AcaoDaOrbe.Nenhuma)
         assertThat(depois.acao3Toques).isEqualTo(AcaoDaOrbe.Nenhuma)
     }
 
@@ -125,10 +125,20 @@ class ModeloTest {
     }
 
     @Test
+    fun `D14 copiar o seletor em qualquer toque vira Nenhuma sem mudar a orbe principal`() {
+        val s = ptt.copy(shortcut1Tap = OrbShortcutAction.SWITCH_IME, shortcut2Tap = OrbShortcutAction.SWITCH_IME, shortcut3Tap = OrbShortcutAction.SWITCH_IME)
+        val e = efetiva(ConfigNotificacao(), s)
+        assertThat(listOf(e.acao1, e.acao2, e.acao3)).containsExactly(AcaoDaOrbe.Nenhuma, AcaoDaOrbe.Nenhuma, AcaoDaOrbe.Nenhuma)
+        assertThat(e.iniciaGravacao).isFalse()
+        assertThat(s.shortcut3Tap).isEqualTo(OrbShortcutAction.SWITCH_IME)
+        assertThat(desligarCopia(ConfigNotificacao(), s).acao1Toque).isEqualTo(AcaoDaOrbe.Nenhuma)
+    }
+
+    @Test
     fun `mapa dos atalhos`() {
         assertThat(acaoDoAtalho(OrbShortcutAction.NONE)).isEqualTo(AcaoDaOrbe.Nenhuma)
         assertThat(acaoDoAtalho(OrbShortcutAction.TOGGLE_KEYBOARD)).isEqualTo(AcaoDaOrbe.RetrairExpandirTeclado)
-        assertThat(acaoDoAtalho(OrbShortcutAction.SWITCH_IME)).isEqualTo(AcaoDaOrbe.TrocarTeclado)
+        assertThat(acaoDoAtalho(OrbShortcutAction.SWITCH_IME)).isEqualTo(AcaoDaOrbe.Nenhuma)
         assertThat(acaoDoAtalho(OrbShortcutAction.VISION_MODE)).isEqualTo(AcaoDaOrbe.LerTela)
     }
 

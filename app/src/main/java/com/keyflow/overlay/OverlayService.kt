@@ -36,6 +36,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.ClipData
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -54,6 +56,7 @@ import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.keyflow.audio.AudioRecorder
 import com.keyflow.core.ButtonState
@@ -69,6 +72,8 @@ import com.keyflow.data.SettingsRepository
 import com.keyflow.skins.PackOrb
 import com.keyflow.notificacao.AcaoDaOrbe
 import com.keyflow.notificacao.AvisoDaNotificacao
+import com.keyflow.notificacao.EventoPresenca
+import com.keyflow.notificacao.ConfigEfetiva
 import com.keyflow.notificacao.Botao
 import com.keyflow.notificacao.ConfigNotificacao
 import com.keyflow.notificacao.NotificacaoHost
@@ -77,6 +82,8 @@ import com.keyflow.notificacao.AparenciaDaOrbe
 import com.keyflow.notificacao.EstadoVisualDaNotificacao
 import com.keyflow.notificacao.OrcamentoDeBitmaps
 import com.keyflow.notificacao.efetiva
+import com.keyflow.notificacao.app.PostadorDaNotificacao
+import com.keyflow.notificacao.app.TempoDaGravacao
 import com.keyflow.notificacao.app.NotificacaoDaOrbe
 import com.keyflow.notificacao.app.ProvedorDeAparencia
 import com.keyflow.skins.OrbeDePacote
@@ -114,6 +121,16 @@ class OverlayService : Service() {
     private lateinit var coordinator: OverlayCoordinator
     private lateinit var gestureController: RecordingGestureController
     private lateinit var notificacaoDaOrbe: NotificacaoDaOrbe
+    private lateinit var postadorDaNotificacao: PostadorDaNotificacao<PedidoNotificacao, Notification>
+    private var configuracaoDaNotificacao = Configuration()
+    private val mudancaDeBloqueio = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) { atualizarNotificacaoAtual() }
+    }
+    private data class PedidoNotificacao(
+        val estado: ButtonState, val visaoAtiva: Boolean, val config: ConfigNotificacao,
+        val efetiva: ConfigEfetiva, val escuro: Boolean, val idioma: String, val ladoPx: Int,
+        val direito: Boolean, val versaoPacotes: Int, val bloqueada: Boolean, val tempo: TempoDaGravacao,
+    )
 
     /** Os toques da notificação: portão da tela bloqueada, rajada, resolução e execução (NTF-T10). */
     private val notificacaoHost: NotificacaoHost by lazy { criarNotificacaoHost() }
@@ -122,6 +139,7 @@ class OverlayService : Service() {
     /** A configuração da notificação (chave própria do DataStore), ao vivo (NTF-38): vale no toque seguinte, sem reiniciar o serviço. */
     @Volatile
     private var cachedNotificacao: ConfigNotificacao = ConfigNotificacao()
+    private var notificacaoPronta = false
 
     private var floatingButton: OrbButtonView? = null
 
@@ -189,6 +207,8 @@ class OverlayService : Service() {
                 floatingButton?.updateVisionState(it, cachedSettings.themeDark)
                 visionFlowStateForTest.value = it
                 KeyFlowController.updateVisionActive(it != VisionFlowState.NONE)
+                if (isForeground && it == VisionFlowState.CONSENT) postadorDaNotificacao.evento(EventoPresenca.Necessaria)
+                atualizarNotificacaoAtual()
             },
             onResult = { bitmap ->
                 // O consumidor de ações será ligado na VC-T7; a etapa devolve o bitmap ao callback.
@@ -223,13 +243,24 @@ class OverlayService : Service() {
         settingsRepository = SettingsRepository(this)
         windowManager = getSystemService(WindowManager::class.java)
         notificacaoDaOrbe = NotificacaoDaOrbe(this, NOTIFICATION_CHANNEL_ID)
-        provedorDeAparencia = ProvedorDeAparencia(
+        provedorDeAparencia = criarProvedorDeAparenciaParaTeste?.invoke(this) ?: ProvedorDeAparencia(
             context = this,
             skinsUnlocked = { skinsUnlocked },
             abrirPacote = { id -> SkinPackStore.of(this).loadBySkinId(id)?.let(::OrbeDePacote) },
             versaoDosPacotes = { SkinPackStore.changes.value },
         )
         createNotificationChannel()
+        configuracaoDaNotificacao = Configuration(resources.configuration)
+        postadorDaNotificacao = PostadorDaNotificacao(
+            escopo = serviceScope, construir = ::construirNotificacao, minima = notificacaoDaOrbe::construirMinima,
+            permitida = { notificacoesPermitidasParaTeste?.invoke() ?: NotificationManagerCompat.from(this).areNotificationsEnabled() },
+            publicar = { getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, it) },
+            falha = { android.util.Log.w("KeyFlow.Overlay", "Falha ao atualizar a notificação", it) },
+            visibilidade = notificacaoHost.visibilidade,
+        )
+        ContextCompat.registerReceiver(this, mudancaDeBloqueio, IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON); addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_USER_PRESENT)
+        }, ContextCompat.RECEIVER_NOT_EXPORTED)
 
         createCoordinator()
         createGestureController()
@@ -239,9 +270,15 @@ class OverlayService : Service() {
         observeControllerState()
         observeOverlayPosition()
         instance = this
+        atualizarNotificacaoAtual() // aquece em Dispatchers.Default, sem atrasar startForeground
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Um PendingIntent antigo/painel não pode deixar uma sessão nova ociosa nem promover o serviço.
+        if (intent?.action in setOf(ACTION_NOTIF_SHOW, ACTION_NOTIF_DISMISSED) && !isForeground && !foregroundPending) {
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
         when (intent?.action) {
             ACTION_RUN_FLOW -> {
                 // Mesmo um pedido inválido precisa concluir o protocolo de startForegroundService.
@@ -274,13 +311,18 @@ class OverlayService : Service() {
                     pendingRecord = true
                 }
             }
+            ACTION_NOTIF_DISMISSED -> postadorDaNotificacao.evento(EventoPresenca.Dispensou)
+            ACTION_NOTIF_SHOW -> if (isForeground) {
+                postadorDaNotificacao.evento(EventoPresenca.AbaAberta)
+                atualizarNotificacaoAtual()
+            }
             ACTION_OPEN_CONFIG -> openKeyFlowApp()
             ACTION_NOTIF_ORB_TAP -> if (::coordinator.isInitialized) notificacaoHost.aoTocarNaOrbe()
             ACTION_NOTIF_PAUSE_RESUME, ACTION_NOTIF_CANCEL, ACTION_NOTIF_UNDO -> {
                 val botao = intent.getStringExtra(NotificacaoDaOrbe.EXTRA_BOTAO)?.let { n -> Botao.entries.firstOrNull { it.name == n } }
                 if (botao != null && ::coordinator.isInitialized) notificacaoHost.aoTocarNoBotao(botao)
             }
-            ACTION_VISION -> if (::coordinator.isInitialized) visionFlow.start(VisionFlowRequest(coordinator.currentState()))
+            ACTION_VISION -> if (::coordinator.isInitialized && ensureForeground()) visionFlow.start(VisionFlowRequest(coordinator.currentState()))
         }
         return START_STICKY
     }
@@ -302,6 +344,8 @@ class OverlayService : Service() {
      */
     private fun ensureForeground(): Boolean {
         if (!isForeground && !promoteToForeground()) return false
+        postadorDaNotificacao.evento(EventoPresenca.Necessaria)
+        atualizarNotificacaoAtual()
         foregroundPending = false
         if (stopRequested) {
             stopRequested = false
@@ -313,6 +357,7 @@ class OverlayService : Service() {
 
     private fun stopNow() {
         overlayActive = false
+        postadorDaNotificacao.evento(EventoPresenca.SessaoTerminou)
         stopForeground(STOP_FOREGROUND_REMOVE)
         isForeground = false
         stopSelf()
@@ -320,9 +365,7 @@ class OverlayService : Service() {
 
     private fun promoteToForeground(): Boolean {
         syncLocalEngine()
-        val notification = notificacaoDoEstado(
-            if (::coordinator.isInitialized) coordinator.currentState() else ButtonState.IDLE_NO_FIELD,
-        )
+        val notification = notificacaoInicial()
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
@@ -330,6 +373,7 @@ class OverlayService : Service() {
                 startForeground(NOTIFICATION_ID, notification)
             }
             isForeground = true
+            postadorDaNotificacao.evento(EventoPresenca.SessaoIniciou)
             return true
         } catch (e: Exception) {
             // Restrição de FGS em background (Android 12+): encerra limpo em vez de crashar.
@@ -344,12 +388,13 @@ class OverlayService : Service() {
     /** Inicia o consentimento sempre de novo; o chamador recebe a projeção ou uma saída de aborto. */
     private fun requestVisionProjection(onGranted: (MediaProjection) -> Unit, onAbort: () -> Unit) {
         if (!ensureForeground()) { onAbort(); return }
+        pedirConsentimentoVisaoParaTeste?.let { it(); return }
         val requested = VisionConsentActivity.request(this) { data ->
             if (data == null) {
                 onAbort()
             } else {
                 val session = VisionProjectionSession(this, NOTIFICATION_ID,
-                    { notificacaoDoEstado(coordinator.currentState()) }, onAbort,
+                    { notificacaoInicial() }, onAbort,
                     { visionProjectionTypeForTest?.invoke(it) })
                 visionProjection = session
                 try { onGranted(session.start(data)) } catch (error: Exception) {
@@ -428,6 +473,8 @@ class OverlayService : Service() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        configuracaoDaNotificacao = Configuration(newConfig)
+        atualizarNotificacaoAtual()
         val previous = visionSelectorConfiguration ?: return
         val geometry = ActivityInfo.CONFIG_ORIENTATION or ActivityInfo.CONFIG_SCREEN_SIZE or ActivityInfo.CONFIG_DENSITY
         // O callback de display pode chegar antes de os Resources refletirem a rotação.
@@ -590,6 +637,7 @@ class OverlayService : Service() {
             visionFlow.state != VisionFlowState.NONE || visionRestartDialog != null || errorBanner != null) return
         val idle = state == ButtonState.IDLE_READY || state == ButtonState.IDLE_NO_FIELD
         if (idle) {
+            postadorDaNotificacao.evento(EventoPresenca.SessaoTerminou)
             stopForeground(STOP_FOREGROUND_REMOVE)
             isForeground = false
             stopSelf()
@@ -615,7 +663,6 @@ class OverlayService : Service() {
             override fun executar(acao: AcaoDaOrbe) = executarAcaoDeAtalho(
                 when (acao) {
                     AcaoDaOrbe.RetrairExpandirTeclado -> OrbShortcutAction.TOGGLE_KEYBOARD
-                    AcaoDaOrbe.TrocarTeclado -> OrbShortcutAction.SWITCH_IME
                     AcaoDaOrbe.LerTela -> OrbShortcutAction.VISION_MODE
                     else -> OrbShortcutAction.NONE
                 },
@@ -674,41 +721,71 @@ class OverlayService : Service() {
         }
     }
 
-    private fun postNotification(state: ButtonState) {
-        getSystemService(NotificationManager::class.java)
-            .notify(NOTIFICATION_ID, notificacaoDoEstado(state))
+    private fun atualizarNotificacaoAtual() {
+        if (::coordinator.isInitialized && ::postadorDaNotificacao.isInitialized && !destroying) postNotification(coordinator.currentState())
     }
 
-    /**
-     * A notificação do estado: a orbe na skin escolhida com os botões do estado (NTF-05..07). Com `mostrar = false`, quando a aparência passa do
-     * orçamento de bitmaps ou quando nem o Ateliê desenha, a notificação **mínima** (NTF-21/30): `startForeground` nunca recebe nulo.
-     */
-    private fun notificacaoDoEstado(state: ButtonState): Notification {
-        val config = cachedNotificacao
-        if (!config.mostrar) return notificacaoDaOrbe.construirMinima()
-        return try {
-            val visaoAtiva = visionFlow.state != VisionFlowState.NONE
-            val efetiva = efetiva(config, cachedSettings)
-            val visual = EstadoVisualDaNotificacao.para(state, visaoAtiva, efetiva)
-            val lado = OrcamentoDeBitmaps.ladoPx(resources.displayMetrics.density)
-            val escuro = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-            val real = provedorDeAparencia.obterAgora(efetiva.skin, visual.aparencia, visual.glifo, lado, escuro)
-            val repouso = provedorDeAparencia.obterAgora(efetiva.skin, AparenciaDaOrbe.IDLE, null, lado, escuro)
-            if (!OrcamentoDeBitmaps.cabe(listOf(real.orbe.allocationByteCount.toLong(), repouso.orbe.allocationByteCount.toLong()))) {
-                return notificacaoDaOrbe.construirMinima()
-            }
-            notificacaoDaOrbe.construir(state, visaoAtiva, real, repouso, config, efetiva, escuro)
-        } catch (e: Exception) {
-            android.util.Log.w("KeyFlow.Overlay", "aparência da notificação falhou: ${e.message}", e)
-            notificacaoDaOrbe.construirMinima()
-        } catch (e: OutOfMemoryError) {
-            android.util.Log.w("KeyFlow.Overlay", "sem memória para a aparência da notificação", e)
-            notificacaoDaOrbe.construirMinima()
-        }
+    private fun postNotification(state: ButtonState) {
+        postadorDaNotificacao.solicitar(pedidoNotificacao(state))
     }
+
+    private fun pedidoNotificacao(state: ButtonState): PedidoNotificacao {
+        val e = efetiva(cachedNotificacao, cachedSettings)
+        if (!notificacaoPronta || !cachedNotificacao.mostrar) {
+            // A mínima só tem título/ícone: pausa, skin e modo noturno não mudam nada visível.
+            return PedidoNotificacao(ButtonState.IDLE_NO_FIELD, false,
+                ConfigNotificacao(mostrar = false, copiarDaOrbePrincipal = false),
+                efetiva(ConfigNotificacao(copiarDaOrbePrincipal = false), Settings()),
+                false, cachedSettings.appLanguage, 0, false, 0, false, TempoDaGravacao(0, 0))
+        }
+        // A chave contém só valores visíveis: trocar uma ação sem alterar a descrição não gera notify.
+        val config = cachedNotificacao.copy(copiarDaOrbePrincipal = false, skin = e.skin,
+            acao1Toque = AcaoDaOrbe.Nenhuma, acao2Toques = AcaoDaOrbe.Nenhuma, acao3Toques = AcaoDaOrbe.Nenhuma)
+        val efetivaVisual = e.copy(acao1 = AcaoDaOrbe.Nenhuma, acao2 = AcaoDaOrbe.Nenhuma, acao3 = AcaoDaOrbe.Nenhuma,
+            copiado = false, naoTem = emptyList())
+        val tempo = if (state in setOf(ButtonState.RECORDING, ButtonState.PAUSED, ButtonState.CANCELLING))
+            TempoDaGravacao(KeyFlowController.recordingAccumulatedMs, KeyFlowController.recordingSegmentStartMs)
+            else TempoDaGravacao(0, 0)
+        return PedidoNotificacao(
+            if (state == ButtonState.IDLE_READY) ButtonState.IDLE_NO_FIELD else state,
+            visionFlow.state != VisionFlowState.NONE, config, efetivaVisual,
+            configuracaoDaNotificacao.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES,
+            cachedSettings.appLanguage, OrcamentoDeBitmaps.ladoPx(resources.displayMetrics.density),
+            skinsUnlocked, SkinPackStore.changes.value,
+            bloqueadaParaTeste?.invoke() ?: (getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true), tempo,
+        )
+    }
+
+    private fun notificacaoInicial(): Notification = postadorDaNotificacao.inicial(pedidoNotificacao(
+        if (::coordinator.isInitialized) coordinator.currentState() else ButtonState.IDLE_NO_FIELD,
+    ))
+
+    /** Só o trabalhador do postador chama: pacotes, bitmaps e RemoteViews ficam fora da thread principal. */
+    private fun construirNotificacao(p: PedidoNotificacao): Notification {
+        if (!p.config.mostrar) return notificacaoDaOrbe.construirMinima()
+        val visual = EstadoVisualDaNotificacao.para(p.estado, p.visaoAtiva, p.efetiva)
+        // ProvedorDeAparencia já faz skin → Ateliê; a falha total vira mínima no postador.
+        val real = provedorDeAparencia.obterAgora(p.efetiva.skin, visual.aparencia, visual.glifo, p.ladoPx, p.escuro)
+        val repouso = provedorDeAparencia.obterAgora(p.efetiva.skin, AparenciaDaOrbe.IDLE, null, p.ladoPx, p.escuro)
+        if (!OrcamentoDeBitmaps.cabe(listOf(real.orbe.allocationByteCount.toLong(), repouso.orbe.allocationByteCount.toLong()))) {
+            return notificacaoDaOrbe.construirMinima()
+        }
+        return notificacaoDaOrbe.construir(p.estado, p.visaoAtiva, real, repouso, p.config, p.efetiva, p.escuro, tempo = p.tempo)
+    }
+
+    internal val notificacoesPublicadasParaTeste: Int get() = postadorDaNotificacao.publicacoes
+    internal val ultimaNotificacaoParaTeste: Notification? get() = postadorDaNotificacao.ultimaPublicada
+    internal val notificacaoInicialParaTeste: Notification? get() = postadorDaNotificacao.ultimaInicial
+    internal val notificacaoPendenteParaTeste: Boolean get() = postadorDaNotificacao.temPendencia
+    internal val notificacaoVisivelParaTeste: Boolean get() = postadorDaNotificacao.podePostar
+    internal val configNotificacaoParaTeste: ConfigNotificacao get() = cachedNotificacao
+    internal val modoNoturnoNotificacaoParaTeste: Boolean get() = configuracaoDaNotificacao.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
 
     override fun onDestroy() {
         destroying = true
+        if (::postadorDaNotificacao.isInitialized) postadorDaNotificacao.encerrar()
+        notificacaoHost.parar()
+        unregisterReceiver(mudancaDeBloqueio)
         if (::fluxoHost.isInitialized) fluxoHost.cancelar()
         pendingRunFlow = null
         instance = null
@@ -747,7 +824,12 @@ class OverlayService : Service() {
             render = { state ->
                 floatingButton?.render(state)
                 KeyFlowController.updateButtonState(state)
-                if (isForeground) postNotification(state)
+                if (isForeground) {
+                    if (state == ButtonState.RECORDING && lastButtonState != ButtonState.RECORDING && lastButtonState != ButtonState.PAUSED) {
+                        postadorDaNotificacao.evento(EventoPresenca.Necessaria)
+                    }
+                    postNotification(state)
+                }
                 lastButtonState = state
                 refreshPartialUi()
                 maybeStopWhenIdle(state)
@@ -772,7 +854,10 @@ class OverlayService : Service() {
             onHideLimitReached = { removeLimitBanner() },
             maxRecordingMs = { cachedSettings.maxRecordingSec * 1000L },
             limitBannerDismissMs = limitBannerDismissMs,
-            onRecordingTime = { acc, seg -> KeyFlowController.updateRecordingTime(acc, seg) },
+            onRecordingTime = { acc, seg ->
+                KeyFlowController.updateRecordingTime(acc, seg)
+                atualizarNotificacaoAtual()
+            },
             onError = { message, target ->
                 KeyFlowController.errorNavTarget = target
                 // Erro clicável (Transcrição ou Sobrepor) + permissão de sobreposição → banner clicável. Senão toast.
@@ -907,15 +992,16 @@ class OverlayService : Service() {
         // A configuração da notificação (NTF-38): ao vivo; mudar skin/“mostrar” re-posta a notificação.
         serviceScope.launch {
             settingsRepository.configNotificacaoFlow().collect {
-                val mudouAparencia = it.mostrar != cachedNotificacao.mostrar || it.skin != cachedNotificacao.skin ||
-                    it.copiarDaOrbePrincipal != cachedNotificacao.copiarDaOrbePrincipal || it.permitirComTelaBloqueada != cachedNotificacao.permitirComTelaBloqueada
                 cachedNotificacao = it
-                if (mudouAparencia && isForeground && ::coordinator.isInitialized) postNotification(coordinator.currentState())
+                notificacaoPronta = true
+                atualizarNotificacaoAtual()
             }
         }
         serviceScope.launch {
             settingsRepository.skinsUnlockedFlow().distinctUntilChanged().collect { unlocked ->
                 skinsUnlocked = unlocked
+                provedorDeAparencia.invalidar()
+                atualizarNotificacaoAtual()
                 floatingButton?.setOrbStyle(com.keyflow.ui.orb.orbStyleFor(cachedSettings.orbSkin, unlocked))
             }
         }
@@ -923,6 +1009,8 @@ class OverlayService : Service() {
         // pacote que sumiu devolve a orbe ao Ateliê. O primeiro valor do fluxo (o de agora) não conta.
         serviceScope.launch {
             SkinPackStore.changes.drop(1).collect {
+                provedorDeAparencia.invalidar()
+                atualizarNotificacaoAtual()
                 if (SkinIds.isPack(cachedSettings.orbSkin)) floatingButton?.setOrbPack(openOrbPack(cachedSettings.orbSkin))
             }
         }
@@ -932,22 +1020,17 @@ class OverlayService : Service() {
                 val prevSide = cachedSettings.overlaySide
                 val prevTapBurst = cachedSettings.tapBurstWindowMs
                 val prevThemeDark = cachedSettings.themeDark
-                val prevLanguage = cachedSettings.appLanguage
                 val prevOrbSkin = cachedSettings.orbSkin
                 cachedSettings = it
-                // Idioma ao vivo: a notificação é texto — re-posta no idioma novo (o App já trocou o AppLocale).
-                if (it.appLanguage != prevLanguage && isForeground && ::coordinator.isInitialized) {
-                    postNotification(coordinator.currentState())
-                }
+                // O postador compara só o retrato visível (idioma/skin/descrição); não inclui themeDark.
+                atualizarNotificacaoAtual()
                 // Skin da orbe ao vivo (aba Sobrepor → Skins).
                 if (it.orbSkin != prevOrbSkin) {
                     floatingButton?.setOrbStyle(com.keyflow.ui.orb.orbStyleFor(it.orbSkin, skinsUnlocked))
                     floatingButton?.setOrbPack(openOrbPack(it.orbSkin))
                 }
-                // Tema ao vivo (raro, disparado pelo usuário → barato): re-posta a notificação e recolore os
-                // banners de overlay visíveis, espelhando o que o toast in-app (Compose) já faz sozinho.
+                // O tema do app recolore só os banners do overlay; a notificação segue o sistema (NTF-28).
                 if (it.themeDark != prevThemeDark) {
-                    if (isForeground && ::coordinator.isInitialized) postNotification(coordinator.currentState())
                     errorBanner?.let(::applyBannerTheme)
                     cancelBanner?.let(::applyBannerTheme)
                     limitBanner?.let(::applyBannerTheme)
@@ -1479,12 +1562,19 @@ class OverlayService : Service() {
         floatingButtonParams = null
     }
 
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.O)
+    internal fun canaisDaNotificacao(): List<NotificationChannel> = listOf(
+        NotificationChannel(NOTIFICATION_CHANNEL_ID, "KeyFlow", NotificationManager.IMPORTANCE_LOW),
+        NotificationChannel(NotificacaoDaOrbe.CANAL_MINIMO, "KeyFlow (mínimo)", NotificationManager.IMPORTANCE_MIN),
+    ).onEach { it.setSound(null, null); it.enableVibration(false) }
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val canais = getSystemService(NotificationManager::class.java)
-            canais.createNotificationChannel(NotificationChannel(NOTIFICATION_CHANNEL_ID, "KeyFlow", NotificationManager.IMPORTANCE_LOW))
-            // A notificação mínima (NTF-21): importância mínima, sem som nem orbe.
-            canais.createNotificationChannel(NotificationChannel(NotificacaoDaOrbe.CANAL_MINIMO, "KeyFlow (mínimo)", NotificationManager.IMPORTANCE_MIN))
+            for (canal in canaisDaNotificacao()) {
+                // Não altera escolhas existentes nem tenta rebaixar a promoção MIN → LOW feita pelo Android para FGS.
+                if (canais.getNotificationChannel(canal.id) == null) canais.createNotificationChannel(canal)
+            }
         }
     }
 
@@ -1535,6 +1625,7 @@ class OverlayService : Service() {
         internal var portasDeFluxoForTest: (() -> com.keyflow.fluxos.execucao.Portas)? = null
         internal var avisoDeFluxoForTest: ((String, com.keyflow.fluxos.execucao.DestinoAba?) -> Unit)? = null
         internal var errorBannerDurationMsForTest: Long? = null
+        internal var pedirConsentimentoVisaoParaTeste: (() -> Unit)? = null
         internal var visionRestartShowForTest: ((android.app.AlertDialog) -> Unit)? = null
         internal var visionSessionCloseForTest: ((Boolean) -> Unit)? = null
         internal val visionFlowStateForTest = kotlinx.coroutines.flow.MutableStateFlow(VisionFlowState.NONE)
@@ -1586,6 +1677,15 @@ class OverlayService : Service() {
         /** Só para os testes: no lugar do `KeyguardManager`, diz se a tela está bloqueada (sem mexer no SystemUI do aparelho). */
         @Volatile
         var bloqueadaParaTeste: (() -> Boolean)? = null
+
+        /** Portas dos testes instrumentados, sem revogar permissões ou mudar o SystemUI. */
+        @Volatile var notificacoesPermitidasParaTeste: (() -> Boolean)? = null
+        @Volatile var criarProvedorDeAparenciaParaTeste: ((Context) -> ProvedorDeAparencia)? = null
+
+        /** O painel não cria um serviço só para repor a notificação (NTF-19). */
+        fun mostrarNotificacaoSeEmPrimeiroPlano(context: Context) {
+            if (instance?.isForeground == true) context.startService(actionIntent(context, ACTION_NOTIF_SHOW))
+        }
 
         // Um startForegroundService ainda sem o startForeground do serviço, e um stop() que chegou nesse meio-tempo.
         // Tudo roda na thread principal do mesmo processo (a SetupActivity, o IME e o serviço), então não há corrida

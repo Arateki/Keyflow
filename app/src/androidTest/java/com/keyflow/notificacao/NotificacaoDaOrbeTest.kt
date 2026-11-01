@@ -19,6 +19,7 @@ import com.keyflow.core.ButtonState
 import com.keyflow.data.Settings
 import com.keyflow.i18n.AppLanguage
 import com.keyflow.i18n.AppLocale
+import com.keyflow.notificacao.app.TempoDaGravacao
 import com.keyflow.notificacao.app.NotificacaoDaOrbe
 import com.keyflow.notificacao.app.ProvedorDeAparencia
 import com.keyflow.overlay.OverlayService
@@ -57,6 +58,7 @@ class NotificacaoDaOrbeTest {
         skin: String = "atelie",
         escuro: Boolean = false,
         tinta: Int? = null,
+        tempo: TempoDaGravacao? = null,
     ): Notification {
         val efetiva = efetiva(config, Settings())
         val visual = EstadoVisualDaNotificacao.para(estado, visao, efetiva)
@@ -65,7 +67,7 @@ class NotificacaoDaOrbeTest {
             estado, visao,
             p.obterAgora(skin, visual.aparencia, visual.glifo, lado, escuro).let { if (tinta != null) it.copy(tinta = tinta) else it },
             p.obterAgora(skin, AparenciaDaOrbe.IDLE, null, lado, escuro).let { if (tinta != null) it.copy(tinta = tinta) else it },
-            config, efetiva, escuro,
+            config, efetiva, escuro, tempo = tempo,
         )
     }
 
@@ -127,6 +129,19 @@ class NotificacaoDaOrbeTest {
         assertTrue(ocioso.v(R.id.notif_orb).hasOnClickListeners())
         assertFalse("botão ausente não clica", ocioso.v(R.id.notif_btn_esq).hasOnClickListeners())
         assertEquals(OverlayService.ACTION_NOTIF_ORB_TAP, "com.keyflow.overlay.NOTIF_ORB_TAP")
+    }
+
+    @Test
+    fun tempoDoCoordenadorNaoDependeDosEstadosIntermediariosQueForamDesenhados() {
+        val inicio = android.os.SystemClock.elapsedRealtime()-2_000
+        val n = construir(ButtonState.RECORDING, tempo = TempoDaGravacao(5_000, inicio))
+        val correndo = conteudo(n).v(R.id.notif_time) as android.widget.Chronometer
+        assertEquals(inicio-5_000, correndo.base)
+        val antes = android.os.SystemClock.elapsedRealtime()
+        val pausa = conteudo(construir(ButtonState.PAUSED, tempo = TempoDaGravacao(7_000, inicio)))
+            .v(R.id.notif_time_mini) as android.widget.Chronometer
+        val depois = android.os.SystemClock.elapsedRealtime()
+        assertTrue("pausa não usou o acumulado autoritativo", pausa.base in (antes-7_000)..(depois-7_000))
     }
 
     @Test
