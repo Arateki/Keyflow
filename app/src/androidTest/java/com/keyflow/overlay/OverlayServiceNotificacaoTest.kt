@@ -264,6 +264,10 @@ class OverlayServiceNotificacaoTest {
         botaoAte(Botao.RETOMAR, ButtonState.RECORDING)
         toqueNaOrbe()
         waitUntilState(ButtonState.SENDING, ButtonState.ERROR, ButtonState.IDLE_NO_FIELD, ButtonState.IDLE_READY, ButtonState.PENDING_PASTE)
+        val depoisDaJanela = android.os.SystemClock.uptimeMillis() + 300
+        waitUntil({ "o publicador não passou da janela de coalescência" }) {
+            android.os.SystemClock.uptimeMillis() >= depoisDaJanela && !servico().notificacaoPendenteParaTeste
+        }
         assertFalse(servico().notificacaoVisivelParaTeste)
         assertEquals(posts, servico().notificacoesPublicadasParaTeste)
         assertTrue("dispensar alterou preferências", antes == preferencias())
