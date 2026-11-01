@@ -1,6 +1,10 @@
 package com.keyflow.overlay
 
 import android.Manifest
+import android.app.Notification
+import android.app.NotificationManager
+import android.content.res.Configuration
+import android.os.Looper
 import android.app.ActivityManager
 import android.os.Bundle
 import java.util.concurrent.CopyOnWriteArrayList
@@ -23,6 +27,8 @@ import com.keyflow.data.SettingsRepository
 import com.keyflow.notificacao.AcaoDaOrbe
 import com.keyflow.notificacao.Botao
 import com.keyflow.notificacao.ConfigNotificacao
+import com.keyflow.notificacao.app.ProvedorDeAparencia
+import com.keyflow.notificacao.app.RenderizadorDeOrbe
 import com.keyflow.notificacao.app.NotificacaoDaOrbe
 import com.keyflow.ui.onboarding.DISCLOSURE_VERSION
 import kotlinx.coroutines.flow.first
@@ -30,6 +36,8 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -59,6 +67,9 @@ class OverlayServiceNotificacaoTest {
     fun setUp() {
         pararServicoEEsperar()
         OverlayService.bloqueadaParaTeste = null
+        OverlayService.notificacoesPermitidasParaTeste = null
+        OverlayService.criarProvedorDeAparenciaParaTeste = null
+        OverlayService.pedirConsentimentoVisaoParaTeste = null
         shell("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
         shell("appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow")
         OverlayService.cancelWindowMsForTest = 30_000L
@@ -83,6 +94,9 @@ class OverlayServiceNotificacaoTest {
         } finally {
             OverlayService.cancelWindowMsForTest = null
             OverlayService.bloqueadaParaTeste = null
+            OverlayService.notificacoesPermitidasParaTeste = null
+            OverlayService.criarProvedorDeAparenciaParaTeste = null
+            OverlayService.pedirConsentimentoVisaoParaTeste = null
             if (consentimentoSalvo) runBlocking {
                 repo.atualizarNotificacao { ConfigNotificacao() }
                 repo.saveDisclosureConsent(savedVersion, savedDeclined)
@@ -223,6 +237,169 @@ class OverlayServiceNotificacaoTest {
         waitUntil({ "config não chegou" }) { runBlocking { repo.configNotificacaoOnce().permitirComTelaBloqueada } }
         Thread.sleep(300)
         botaoAte(Botao.PAUSAR, ButtonState.PAUSED)
+    }
+
+    private fun servico() = checkNotNull(OverlayService.instanceForVisionTest)
+    private fun acao(acao: String) = context.startService(OverlayService.actionIntent(context, acao))
+    private fun assentarNotificacao() = waitUntil({ "a notificação não assentou" }, 15_000) { !servico().notificacaoPendenteParaTeste }
+    private fun persistente() {
+        acao(OverlayService.ACTION_START_OVERLAY)
+        waitUntil({ "o modo persistente não iniciou" }) { OverlayService.isRunningForUi }
+        assentarNotificacao()
+    }
+    private fun dispensar() {
+        val n = servico().ultimaNotificacaoParaTeste ?: servico().notificacaoInicialParaTeste
+        checkNotNull(n?.deleteIntent).send()
+        waitUntil({ "deleteIntent não dispensou" }) { !servico().notificacaoVisivelParaTeste }
+    }
+    private fun preferencias() = runBlocking { repo.rawPreferencesOnce().asMap().toMap() }
+
+    @Test
+    fun dispensarNaoRepostaEmPausaRetomadaEEnvioENaoGravaNoDataStore() {
+        persistente()
+        val antes = preferencias()
+        dispensar()
+        val posts = servico().notificacoesPublicadasParaTeste
+        botaoAte(Botao.PAUSAR, ButtonState.PAUSED)
+        botaoAte(Botao.RETOMAR, ButtonState.RECORDING)
+        toqueNaOrbe()
+        waitUntilState(ButtonState.SENDING, ButtonState.ERROR, ButtonState.IDLE_NO_FIELD, ButtonState.IDLE_READY, ButtonState.PENDING_PASTE)
+        assertFalse(servico().notificacaoVisivelParaTeste)
+        assertEquals(posts, servico().notificacoesPublicadasParaTeste)
+        assertTrue("dispensar alterou preferências", antes == preferencias())
+        assertTrue("dispensar não encerra o primeiro plano", servico().foregroundForTest)
+    }
+
+    @Test
+    fun novaEntradaEInicioDeGravacaoRecompoemADispensada() {
+        persistente()
+        for (entrada in listOf(OverlayService.ACTION_START_OVERLAY, OverlayService.ACTION_KEYBOARD_MIC, OverlayService.ACTION_RECORD)) {
+            assentarNotificacao(); dispensar()
+            acao(entrada)
+            waitUntil({ "a entrada $entrada não repôs" }) { servico().notificacaoVisivelParaTeste }
+            assentarNotificacao()
+        }
+        // Uma sessão persistente nova isola a prova do resultado da transcrição anterior.
+        pararServicoEEsperar()
+        instrumentation.runOnMainSync { OverlayService.start(context, OverlayService.startOverlayIntent(context)) }
+        waitUntil({ "a sessão persistente nova não iniciou" }) { OverlayService.isRunningForUi }
+        waitUntilState(ButtonState.IDLE_NO_FIELD, ButtonState.IDLE_READY)
+        assentarNotificacao(); dispensar()
+        instrumentation.runOnMainSync { servico().coordinatorForTest.onTap() }
+        waitUntilState(ButtonState.RECORDING)
+        waitUntil({ "a gravação nova não repôs" }) { servico().notificacaoVisivelParaTeste }
+    }
+
+    @Test
+    fun visaoEAbaAbertaRepoemMasOAbaNaoIniciaServico() {
+        persistente(); dispensar()
+        OverlayService.pedirConsentimentoVisaoParaTeste = {}
+        acao(OverlayService.ACTION_VISION)
+        waitUntil({ "Visão não repôs" }) { servico().notificacaoVisivelParaTeste }
+        assentarNotificacao(); dispensar()
+        OverlayService.mostrarNotificacaoSeEmPrimeiroPlano(context)
+        waitUntil({ "a aba não repôs" }) { servico().notificacaoVisivelParaTeste }
+        pararServicoEEsperar()
+        OverlayService.mostrarNotificacaoSeEmPrimeiroPlano(context)
+        instrumentation.waitForIdleSync()
+        assertNull(OverlayService.instanceForVisionTest)
+        assertFalse(servicoRegistrado())
+    }
+
+    @Test
+    fun mostrarDesligadoUsaSoAMinimaInclusiveNoPrimeiroPlanoECanaisSaoSilenciosos() {
+        config { it.copy(mostrar = false) }
+        waitUntil({ "config mínima não chegou" }) { !servico().configNotificacaoParaTeste.mostrar }
+        assentarNotificacao()
+        fun minima(n: Notification?) {
+            assertNotNull(n)
+            assertEquals(NotificacaoDaOrbe.CANAL_MINIMO, n!!.channelId)
+            assertEquals(Notification.VISIBILITY_SECRET, n.visibility)
+            assertNull(n.contentView)
+            assertTrue(n.actions.isNullOrEmpty())
+            assertTrue(n.flags and Notification.FLAG_ONGOING_EVENT != 0)
+        }
+        minima(servico().ultimaNotificacaoParaTeste ?: servico().notificacaoInicialParaTeste)
+        pararServicoEEsperar()
+        instrumentation.runOnMainSync { OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_RECORD)) }
+        esperarGravacaoNova(); assentarNotificacao()
+        minima(servico().notificacaoInicialParaTeste)
+        minima(servico().ultimaNotificacaoParaTeste ?: servico().notificacaoInicialParaTeste)
+        val canais = context.getSystemService(NotificationManager::class.java)
+        assertEquals(NotificationManager.IMPORTANCE_LOW, canais.getNotificationChannel("keyflow_overlay").importance)
+        val pedido = servico().canaisDaNotificacao().single { it.id == NotificacaoDaOrbe.CANAL_MINIMO }
+        assertEquals("o app pede MIN", NotificationManager.IMPORTANCE_MIN, pedido.importance)
+        assertNull(pedido.sound)
+        assertFalse(pedido.shouldVibrate())
+        // AOSP 14, NotificationManagerService:6277–6293: o primeiro FGS promove MIN para LOW.
+        val efetiva = canais.getNotificationChannel(NotificacaoDaOrbe.CANAL_MINIMO).importance
+        assertTrue("importância do canal mínima ou promovida pelo sistema: $efetiva",
+            efetiva == NotificationManager.IMPORTANCE_MIN || efetiva == NotificationManager.IMPORTANCE_LOW)
+        @Suppress("DEPRECATION") // o canal existente pode guardar a escolha anterior do usuário; a publicação é silenciosa
+        assertNull(servico().notificacaoInicialParaTeste!!.sound)
+        assertTrue(servico().foregroundForTest)
+    }
+
+    @Test
+    fun permissaoNegadaNaoImpedeOPrimeiroPlanoNemDerrubaOServico() {
+        pararServicoEEsperar()
+        OverlayService.notificacoesPermitidasParaTeste = { false }
+        instrumentation.runOnMainSync { OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_RECORD)) }
+        esperarGravacaoNova(); assentarNotificacao()
+        assertNotNull(servico().notificacaoInicialParaTeste)
+        assertTrue(servico().foregroundForTest)
+        assertEquals(0, servico().notificacoesPublicadasParaTeste)
+        OverlayService.notificacoesPermitidasParaTeste = { true }
+        OverlayService.mostrarNotificacaoSeEmPrimeiroPlano(context)
+        waitUntil({ "permissão concedida não permitiu repor" }) { servico().notificacoesPublicadasParaTeste > 0 }
+    }
+
+    @Test
+    fun modoNoturnoDoSistemaRepostaETemaDoAppNaoMudaANotificacao() {
+        assentarNotificacao()
+        val s = servico()
+        val antes = s.notificacoesPublicadasParaTeste
+        val escuro = s.modoNoturnoNotificacaoParaTeste
+        val nova = Configuration(context.resources.configuration).apply {
+            uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
+                if (escuro) Configuration.UI_MODE_NIGHT_NO else Configuration.UI_MODE_NIGHT_YES
+        }
+        instrumentation.runOnMainSync { s.onConfigurationChanged(nova) }
+        waitUntil({ "modo noturno não re-postou" }) { s.notificacoesPublicadasParaTeste > antes }
+        assertEquals(!escuro, s.modoNoturnoNotificacaoParaTeste)
+        val settings = runBlocking { repo.settingsFlow().first() }
+        try {
+            val posts = s.notificacoesPublicadasParaTeste
+            runBlocking { repo.saveSettings(settings.copy(themeDark = !settings.themeDark)) }
+            waitUntil({ "tema do app não chegou" }) { s.settingsForTest.themeDark != settings.themeDark }
+            assentarNotificacao()
+            assertEquals("tema do app não é o da notificação", !escuro, s.modoNoturnoNotificacaoParaTeste)
+            assertEquals(posts, s.notificacoesPublicadasParaTeste)
+        } finally { runBlocking { repo.saveSettings(settings) } }
+    }
+
+    @Test
+    fun renderForaDaMainCaiNoAtelieEDepoisNaMinimaSemImpedirOPrimeiroPlano() {
+        for (falhaTotal in listOf(false, true)) {
+            pararServicoEEsperar()
+            val estilos = CopyOnWriteArrayList<com.keyflow.ui.orb.OrbStyle>()
+            OverlayService.criarProvedorDeAparenciaParaTeste = { ctx ->
+                ProvedorDeAparencia(ctx, skinsUnlocked = { true }, renderizar = { estilo, estado, lado, glifo ->
+                    assertFalse("render na main", Looper.myLooper() == Looper.getMainLooper())
+                    estilos += estilo
+                    if (falhaTotal || estilo == com.keyflow.ui.orb.OrbStyle.GLITCH) throw OutOfMemoryError("simulado")
+                    RenderizadorDeOrbe.renderizar(estilo, estado, lado, glifo)
+                })
+            }
+            config { it.copy(copiarDaOrbePrincipal = false, skin = "glitch") }
+            instrumentation.runOnMainSync { OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_RECORD)) }
+            esperarGravacaoNova(); assentarNotificacao()
+            assertTrue("não tentou o Ateliê", com.keyflow.ui.orb.OrbStyle.ATELIE in estilos)
+            val n = servico().ultimaNotificacaoParaTeste ?: servico().notificacaoInicialParaTeste
+            assertNotNull(n)
+            assertEquals(if (falhaTotal) NotificacaoDaOrbe.CANAL_MINIMO else "keyflow_overlay", n!!.channelId)
+            assertTrue(servico().foregroundForTest)
+        }
     }
 
     private fun waitUntilState(vararg expected: ButtonState, timeoutMs: Long = 8000) =

@@ -459,7 +459,7 @@ class VisibilidadeDaNotificacao {
   Usada: (a) com `mostrar = false`; (b) no `startForeground` enquanto a aparência ainda não está pronta; (c) quando a aparência
   falha por completo. `promoteToForeground` (`:243`) passa a pedir ao `PostadorDaNotificacao` a notificação **inicial** em vez de
   `recordingNotification.build(...)`, e `startForeground` **nunca** recebe nulo.
-- **Canais**: `keyflow_overlay` fica como está (`IMPORTANCE_LOW`, `:1179-1188`); `keyflow_overlay_min` é novo. O botão "Ajustes do
+- **Canais**: `keyflow_overlay` fica como está (`IMPORTANCE_LOW`, `:1179-1188`); `keyflow_overlay_min` é novo e solicitado com `IMPORTANCE_MIN`; o Android 14 pode promovê-lo a `LOW` no primeiro FGS (restrição medida e fonte na lição `2026-11-01-notificacao-c.md`). O botão "Ajustes do
   sistema" abre o canal da orbe.
 - **Permissão** (NTF-22): o `PostadorDaNotificacao` captura qualquer falha de `notify` e confere `areNotificationsEnabled()`; sem
   permissão ele não posta e não falha.
@@ -491,8 +491,8 @@ fun avaliar(bloqueada: Boolean, permitir: Boolean, precisaDeActivity: Boolean): 
   notificação (`OverlayService.kt:680-682`); os banners do overlay continuam com o tema do app.
 - **Idioma**: o re-post no idioma novo já existe (`:669`) e continua.
 - **Coalescência** (`PostadorDaNotificacao`): `solicitar(estado)` registra o último estado e dispara, num dispatcher de fundo, um único
-  `notify` por janela curta (`delay` de ~200 ms com o último valor vencendo — `conflate`). O número que o sistema tolera (L11) é
-  confirmado na NTF-T11; a regra "no máximo um por janela, o último vence" vale qualquer que seja o número. Nada de montar
+  `notify` por janela de **250 ms** com o último valor vencendo (canal conflado). O AOSP 14 usa padrão de 5 atualizações/s por app,
+  ajustável pelo sistema (L11; fonte e exceções na lição `2026-11-01-notificacao-c.md`); a regra nossa independe desse padrão. Nada de montar
   `RemoteViews` na thread principal; `notify` é seguro fora dela.
 - **Primeiro plano**: `startForeground` recebe a notificação pronta *se o cache tem a aparência* (aquecido no `onCreate` do serviço
   e a cada troca de skin); senão a mínima, e o postador troca assim que o bitmap fica pronto.

@@ -49,14 +49,15 @@ class NotificacaoDaOrbe(
         efetiva: ConfigEfetiva,
         escuro: Boolean,
         segundosCongelados: Int? = null,
+        tempo: TempoDaGravacao? = null,
     ): Notification {
         val visual = EstadoVisualDaNotificacao.para(estado, visaoAtiva, efetiva)
         val botoes = BotoesDaNotificacao.para(estado, visaoAtiva)
-        val base = gerirBase(estado)
-        val conteudo = linha(visual, botoes, aparencia, escuro, base, segundosCongelados, estado)
+        val base = tempo?.let { it.inicioDoSegmentoMs-it.acumuladoMs } ?: gerirBase(estado)
+        val conteudo = linha(visual, botoes, aparencia, escuro, base, segundosCongelados, estado, tempo?.acumuladoMs)
         // Versão pública (tela bloqueada, NTF-16/17): com a opção desligada, a orbe em repouso, sem cronômetro e sem botões; ligada, o real.
         val publica = if (config.permitirComTelaBloqueada) {
-            linha(visual, botoes, aparencia, escuro, base, segundosCongelados, estado)
+            linha(visual, botoes, aparencia, escuro, base, segundosCongelados, estado, tempo?.acumuladoMs)
         } else {
             val repouso = EstadoVisualDaNotificacao.para(ButtonState.IDLE_NO_FIELD, false, efetiva)
             linha(repouso, Botoes.NENHUM, aparenciaEmRepouso, escuro, base, null, ButtonState.IDLE_NO_FIELD)
@@ -118,6 +119,7 @@ class NotificacaoDaOrbe(
         baseDoTempo: Long,
         segundosCongelados: Int?,
         estado: ButtonState,
+        tempoCongeladoMs: Long? = null,
     ): RemoteViews {
         val rv = RemoteViews(context.packageName, R.layout.notif_orb)
         // O fundo só é pintado quando a skin declara um (Ateliê; pacote com notification.background); senão fica o do sistema.
@@ -135,6 +137,7 @@ class NotificacaoDaOrbe(
         val tempoBase = when {
             segundosCongelados != null -> agora - segundosCongelados * 1000L
             estado == ButtonState.RECORDING -> baseDoTempo
+            tempoCongeladoMs != null -> agora-tempoCongeladoMs
             else -> agora - (inicioDaPausa - baseDoTempo) // congela no tempo da pausa/cancelamento
         }
         val correndo = visual.cronometro == CronometroDaNotificacao.CORRENDO_NO_CENTRO && segundosCongelados == null
@@ -227,3 +230,6 @@ class NotificacaoDaOrbe(
         private const val COR_ESCURA = 0xFF1B1B1B.toInt()
     }
 }
+
+/** Tempo autoritativo do coordenador; não perde pausas que a coalescência deixa de desenhar. */
+data class TempoDaGravacao(val acumuladoMs: Long, val inicioDoSegmentoMs: Long)

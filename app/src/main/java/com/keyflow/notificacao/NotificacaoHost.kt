@@ -52,6 +52,9 @@ class NotificacaoHost(
     private val vibrar: () -> Unit,
     private val fluxos: GanchoDeFluxoDaNotificacao = { null },
 ) {
+    /** Presença em memória da sessão: dispensar nunca altera a configuração persistida. */
+    val visibilidade = VisibilidadeDaNotificacao()
+
     private val rajada = RajadaDeToques(relogio) { settings().tapBurstWindowMs.toLong() }
     private var fechamento: Job? = null
 
